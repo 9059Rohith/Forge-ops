@@ -1,0 +1,13 @@
+.git
+.github
+**/.env
+**/.env.local
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/.next
+.forgeguard-work
+docs
+frontend
+!demo-repo
+

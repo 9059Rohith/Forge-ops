@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: forgeguard-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:////data/forgeguard.db
+      - key: DEMO_MODE
+        value: "true"
+      - key: MAX_REPAIR_CYCLES
+        value: "2"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+    disk:
+      name: forgeguard-data
+      mountPath: /data
+      sizeGB: 1
+
