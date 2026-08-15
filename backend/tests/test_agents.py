@@ -1,8 +1,11 @@
+import json
 from pathlib import Path
 
 import pytest
 
 from app.agents.demo import demo_engineer, demo_repair, demo_security_review
+from app.agents.repair import run_repair
+from app.providers.base import JSONProvider
 
 
 @pytest.mark.asyncio
@@ -30,3 +33,25 @@ async def test_demo_repair_restores_role_validation(demo_repo_path: Path):
 
     assert "if user_role != role" in auth
     assert "DEMO-ONLY planted regression" not in auth
+
+
+@pytest.mark.asyncio
+async def test_provider_repair_normalizes_a_filename_to_content_map(tmp_path: Path):
+    (tmp_path / "auth.py").write_text("def authorize():\n    return True\n", encoding="utf-8")
+
+    async def completion(_: str, __: str) -> str:
+        return json.dumps({"auth.py": "def authorize():\n    return False\n"})
+
+    result = await run_repair(
+        JSONProvider(completion=completion, timeout_seconds=1),
+        tmp_path,
+        "Preserve authorization",
+        "diff",
+        "Authorization was weakened",
+    )
+
+    assert result["plan"] == "Apply the scoped reviewer-requested repair."
+    assert result["constraints_identified"] == []
+    assert result["files"] == [
+        {"path": "auth.py", "content": "def authorize():\n    return False\n"}
+    ]

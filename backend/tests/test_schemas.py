@@ -16,6 +16,16 @@ def test_task_create_strips_values_and_accepts_https_or_local_demo_repo():
     assert value.description == "Add retry handling."
 
 
+def test_task_create_accepts_an_absolute_windows_repository_path():
+    value = TaskCreate(
+        repo_url=r"C:\Users\Builder\source\checkout",
+        branch="main",
+        description="Add retry handling.",
+    )
+
+    assert value.repo_url == r"C:\Users\Builder\source\checkout"
+
+
 @pytest.mark.parametrize(
     "repo_url",
     [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from pathlib import PureWindowsPath
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
@@ -25,6 +26,8 @@ class TaskCreate(BaseModel):
     @classmethod
     def validate_repo(cls, value: str) -> str:
         if value == "demo":
+            return value
+        if not any(char in value for char in "\r\n\0") and PureWindowsPath(value).is_absolute():
             return value
         parsed = urlsplit(value)
         if (
