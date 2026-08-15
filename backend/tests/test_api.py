@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -59,3 +60,56 @@ async def test_create_rejects_invalid_payload(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_unknown_task_returns_404(client: AsyncClient):
     assert (await client.get("/api/tasks/not-a-task")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_proof_endpoint_includes_a_sealed_terminal_receipt(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+    created = await client.post(
+        "/api/tasks",
+        json={"repo_url": "demo", "branch": "main", "description": "Add safe retries"},
+    )
+    task_id = created.json()["task_id"]
+
+    from app.db import session_scope
+    from app.models import AgentRun, Evaluation, FlightLog, Task
+
+    async with session_scope() as session:
+        task = await session.get(Task, task_id)
+        assert task is not None
+        task.status = "verified"
+        task.risk_level = "LOW"
+        task.confidence_score = 95.5
+        task.repair_cycles = 1
+        task.tests_passed = 5
+        task.tests_total = 5
+        task.changed_files_json = json.dumps(["checkout.py"])
+        task.diff_text = "diff --git a/checkout.py b/checkout.py\n"
+        task.proof_text = "## ForgeGuard Verified\n"
+        for category, score in (("security", 96), ("scope", 97), ("adversarial", 94)):
+            session.add(
+                Evaluation(
+                    task_id=task_id,
+                    category=category,
+                    score=score,
+                    severity="none",
+                    finding=f"{category} approved",
+                    evidence_json="{}",
+                )
+            )
+        session.add(AgentRun(task_id=task_id, agent_name="engineer", status="completed"))
+        session.add(FlightLog(task_id=task_id, event="Task received"))
+        await session.commit()
+
+    response = await client.get(f"/api/tasks/{task_id}/proof")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["markdown"] == "## ForgeGuard Verified\n"
+    assert body["receipt"]["task"]["id"] == task_id
+    assert body["receipt"]["decision"] == "VERIFIED"
+    assert len(body["receipt"]["integrity"]["digest"]) == 64

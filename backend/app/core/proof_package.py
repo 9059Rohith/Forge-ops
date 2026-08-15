@@ -1,7 +1,79 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _canonical_json(value: Mapping[str, Any]) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def build_verification_receipt(
+    *,
+    task_id: str,
+    description: str,
+    repo_url: str,
+    branch: str,
+    changed_files: Sequence[str],
+    tests_passed: int,
+    tests_total: int,
+    evaluations: Mapping[str, Mapping[str, Any]],
+    confidence: float | None,
+    risk_level: str | None,
+    repair_cycles: int,
+    decision: str,
+    agent_runs: Sequence[Mapping[str, Any]],
+    flight_logs: Sequence[Mapping[str, Any]],
+    diff_text: str,
+    proof_text: str,
+) -> dict[str, Any]:
+    reviewers = {
+        name: {
+            "score": evaluation["score"],
+            "severity": evaluation["severity"],
+            "finding": evaluation["finding"],
+            "evidence": evaluation.get("evidence", {}),
+        }
+        for name, evaluation in evaluations.items()
+    }
+    evidence_payload: dict[str, Any] = {
+        "schema_version": "1.0",
+        "decision": decision,
+        "task": {
+            "id": task_id,
+            "description": description,
+            "repository": repo_url,
+            "branch": branch,
+            "changed_files": list(changed_files),
+        },
+        "verification": {
+            "tests": {"passed": tests_passed, "total": tests_total},
+            "reviewers": reviewers,
+            "confidence": confidence,
+            "risk_level": risk_level,
+            "repair_cycles": repair_cycles,
+        },
+        "provenance": {
+            "agent_runs": [dict(run) for run in agent_runs],
+            "flight_logs": [dict(item) for item in flight_logs],
+        },
+        "artifacts": {
+            "diff_sha256": _sha256_text(diff_text),
+            "proof_sha256": _sha256_text(proof_text),
+        },
+    }
+    digest = _sha256_text(_canonical_json(evidence_payload))
+    return {
+        **evidence_payload,
+        "receipt_id": f"fg_{digest[:16]}",
+        "integrity": {"algorithm": "sha256", "digest": digest},
+    }
 
 
 def _icon(severity: str) -> str:

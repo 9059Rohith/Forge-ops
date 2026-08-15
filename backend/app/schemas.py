@@ -110,8 +110,20 @@ class DiffView(BaseModel):
     diff: str
 
 
+class VerificationReceipt(BaseModel):
+    schema_version: str
+    receipt_id: str
+    decision: Literal["VERIFIED", "BLOCKED"]
+    task: dict[str, Any]
+    verification: dict[str, Any]
+    provenance: dict[str, Any]
+    artifacts: dict[str, str]
+    integrity: dict[str, str]
+
+
 class ProofView(BaseModel):
     markdown: str
+    receipt: VerificationReceipt | None = None
 
 
 class RepairAccepted(BaseModel):

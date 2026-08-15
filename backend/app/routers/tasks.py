@@ -10,9 +10,10 @@ from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.core.orchestrator import run_task
+from app.core.proof_package import build_verification_receipt
 from app.db import get_db
 from app.models import Project, Task
-from app.schemas import TaskCreate, TaskCreated
+from app.schemas import ProofView, TaskCreate, TaskCreated
 
 router = APIRouter(tags=["tasks"])
 _running_tasks: set[asyncio.Task[None]] = set()
@@ -127,10 +128,51 @@ async def get_diff(task_id: str, session: AsyncSession = Depends(get_db)):
     return {"diff": task.diff_text}
 
 
-@router.get("/{task_id}/proof")
+@router.get("/{task_id}/proof", response_model=ProofView)
 async def get_proof(task_id: str, session: AsyncSession = Depends(get_db)):
     task = await _task_or_404(session, task_id)
-    return {"markdown": task.proof_text}
+    if not task.proof_text:
+        return {"markdown": task.proof_text, "receipt": None}
+
+    evaluations = {
+        item.category: {
+            "score": item.score,
+            "severity": item.severity,
+            "finding": item.finding,
+            "evidence": item.evidence,
+        }
+        for item in sorted(task.evaluations, key=lambda item: item.category)
+    }
+    receipt = build_verification_receipt(
+        task_id=task.id,
+        description=task.description,
+        repo_url=task.project.repo_url,
+        branch=task.project.branch,
+        changed_files=task.changed_files,
+        tests_passed=task.tests_passed,
+        tests_total=task.tests_total,
+        evaluations=evaluations,
+        confidence=task.confidence_score,
+        risk_level=task.risk_level,
+        repair_cycles=task.repair_cycles,
+        decision="VERIFIED" if task.status == "verified" else "BLOCKED",
+        agent_runs=[
+            {
+                "agent_name": item.agent_name,
+                "status": item.status,
+                "started_at": item.started_at.isoformat(),
+                "completed_at": item.completed_at.isoformat() if item.completed_at else None,
+            }
+            for item in sorted(task.agent_runs, key=lambda item: item.started_at)
+        ],
+        flight_logs=[
+            {"timestamp": item.timestamp.isoformat(), "event": item.event}
+            for item in task.flight_logs
+        ],
+        diff_text=task.diff_text,
+        proof_text=task.proof_text,
+    )
+    return {"markdown": task.proof_text, "receipt": receipt}
 
 
 @router.post("/{task_id}/repair", status_code=status.HTTP_202_ACCEPTED)
