@@ -27,6 +27,7 @@ test-results/
 .forgeguard-work/
 forgeguard-work/
 demo-repo/.git/
+.worktrees/
 
 # OS / editors
 .DS_Store
