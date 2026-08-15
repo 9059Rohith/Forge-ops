@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getDiff, getFlightLog, getProof, getTask } from "@/lib/api";
-import type { FlightLog, TaskDetail } from "@/lib/types";
+import type { FlightLog, TaskDetail, VerificationReceipt } from "@/lib/types";
 
 const TERMINAL = new Set(["verified", "failed"]);
 
@@ -11,6 +11,7 @@ export function useTaskPolling(taskId: string, intervalMs = 1500) {
   const [logs, setLogs] = useState<FlightLog[]>([]);
   const [diff, setDiff] = useState("");
   const [proof, setProof] = useState("");
+  const [receipt, setReceipt] = useState<VerificationReceipt | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,6 +32,7 @@ export function useTaskPolling(taskId: string, intervalMs = 1500) {
         setLogs(nextLogs);
         setDiff(nextDiff.diff);
         setProof(nextProof.markdown);
+        setReceipt(nextProof.receipt);
         setError("");
         setLoading(false);
         if (!TERMINAL.has(nextTask.status)) timer.current = setTimeout(refresh, intervalMs);
@@ -49,6 +51,6 @@ export function useTaskPolling(taskId: string, intervalMs = 1500) {
     };
   }, [intervalMs, taskId]);
 
-  return { task, logs, diff, proof, error, loading };
+  return { task, logs, diff, proof, receipt, error, loading };
 }
 

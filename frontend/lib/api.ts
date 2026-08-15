@@ -1,4 +1,4 @@
-import type { FlightLog, TaskDetail, TaskInput } from "@/lib/types";
+import type { FlightLog, TaskDetail, TaskInput, VerificationReceipt } from "@/lib/types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
@@ -31,5 +31,7 @@ export const getFlightLog = (id: string) =>
 export const getDiff = (id: string) =>
   request<{ diff: string }>(`/api/tasks/${encodeURIComponent(id)}/diff`);
 export const getProof = (id: string) =>
-  request<{ markdown: string }>(`/api/tasks/${encodeURIComponent(id)}/proof`);
+  request<{ markdown: string; receipt: VerificationReceipt | null }>(
+    `/api/tasks/${encodeURIComponent(id)}/proof`,
+  );
 

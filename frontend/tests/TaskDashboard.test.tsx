@@ -6,7 +6,7 @@ vi.mock("next/dynamic", () => ({ default: () => () => <div data-testid="diff-edi
 vi.mock("@/components/AgentGraph", () => ({ AgentGraph: () => <div data-testid="agent-graph" /> }));
 
 import { TaskDashboard } from "@/components/TaskDashboard";
-import type { TaskDetail } from "@/lib/types";
+import type { TaskDetail, VerificationReceipt } from "@/lib/types";
 
 const task: TaskDetail = {
   id: "task-1",
@@ -32,7 +32,7 @@ const task: TaskDetail = {
 
 describe("TaskDashboard", () => {
   it("renders verification evidence and expands reviewer details", async () => {
-    render(<TaskDashboard task={task} logs={[]} diff="diff" proof="proof body" loading={false} />);
+    render(<TaskDashboard task={task} logs={[]} diff="diff" proof="proof body" receipt={null} loading={false} />);
 
     expect(screen.getByText("VERIFIED")).toBeInTheDocument();
     expect(screen.getAllByText("94.6%").length).toBeGreaterThan(0);
@@ -43,9 +43,59 @@ describe("TaskDashboard", () => {
   it("copies the proof package", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    render(<TaskDashboard task={task} logs={[]} diff="diff" proof="proof body" loading={false} />);
+    render(<TaskDashboard task={task} logs={[]} diff="diff" proof="proof body" receipt={null} loading={false} />);
 
     await userEvent.click(screen.getByRole("button", { name: /copy proof/i }));
     expect(writeText).toHaveBeenCalledWith("proof body");
+  });
+
+  it("downloads the sealed verification receipt with its visible identity", async () => {
+    const createObjectURL = vi.fn().mockReturnValue("blob:forgeguard-receipt");
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const receipt = {
+      schema_version: "1.0",
+      receipt_id: "fg_deadbeefdeadbeef",
+      decision: "VERIFIED",
+      task: {
+        id: "task-1",
+        description: "Add retry handling",
+        repository: "demo",
+        branch: "main",
+        changed_files: ["checkout.py"],
+      },
+      verification: {
+        tests: { passed: 5, total: 5 },
+        reviewers: {},
+        confidence: 94.6,
+        risk_level: "LOW",
+        repair_cycles: 1,
+      },
+      provenance: { agent_runs: [], flight_logs: [] },
+      artifacts: { diff_sha256: "a".repeat(64), proof_sha256: "b".repeat(64) },
+      integrity: { algorithm: "sha256", digest: "c".repeat(64) },
+    } satisfies VerificationReceipt;
+    render(
+      <TaskDashboard
+        task={task}
+        logs={[]}
+        diff="diff"
+        proof="proof body"
+        loading={false}
+        receipt={receipt}
+      />,
+    );
+
+    expect(screen.getByText("fg_deadbeefdeadbeef")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /download receipt/i }));
+
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect((click.mock.instances[0] as HTMLAnchorElement).download).toBe(
+      "forgeguard-fg_deadbeefdeadbeef.json",
+    );
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:forgeguard-receipt");
+    click.mockRestore();
   });
 });

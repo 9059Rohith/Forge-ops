@@ -39,6 +39,40 @@ export interface FlightLog {
   event: string;
 }
 
+export interface VerificationReceipt {
+  schema_version: "1.0";
+  receipt_id: string;
+  decision: "VERIFIED" | "BLOCKED";
+  task: {
+    id: string;
+    description: string;
+    repository: string;
+    branch: string;
+    changed_files: string[];
+  };
+  verification: {
+    tests: { passed: number; total: number };
+    reviewers: Record<
+      string,
+      {
+        score: number;
+        severity: string;
+        finding: string;
+        evidence: Record<string, unknown>;
+      }
+    >;
+    confidence: number | null;
+    risk_level: string | null;
+    repair_cycles: number;
+  };
+  provenance: {
+    agent_runs: Array<Record<string, unknown>>;
+    flight_logs: Array<Record<string, unknown>>;
+  };
+  artifacts: { diff_sha256: string; proof_sha256: string };
+  integrity: { algorithm: "sha256"; digest: string };
+}
+
 export interface TaskDetail {
   id: string;
   description: string;

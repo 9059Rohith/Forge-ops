@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, TriangleAlert } from "lucide-react";
-import type { FlightLog, TaskDetail } from "@/lib/types";
+import type { FlightLog, TaskDetail, VerificationReceipt } from "@/lib/types";
 import { AgentGraph } from "@/components/AgentGraph";
 import { Brand } from "@/components/Brand";
 import { DiffViewer } from "@/components/DiffViewer";
@@ -17,10 +17,11 @@ interface Props {
   logs: FlightLog[];
   diff: string;
   proof: string;
+  receipt: VerificationReceipt | null;
   loading: boolean;
 }
 
-export function TaskDashboard({ task, logs, diff, proof }: Props) {
+export function TaskDashboard({ task, logs, diff, proof, receipt }: Props) {
   return (
     <main className="min-h-screen bg-canvas px-3 pb-5 text-ink sm:px-5">
       <header className="mx-auto flex h-[62px] max-w-[1580px] items-center justify-between">
@@ -49,7 +50,7 @@ export function TaskDashboard({ task, logs, diff, proof }: Props) {
             <FlightRecorder logs={logs} />
           </aside>
         </div>
-        <ProofPackage proof={proof} />
+        <ProofPackage proof={proof} receipt={receipt} />
         <footer className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2 font-mono text-[10px] text-muted">
           <span>ForgeGuard v1.0.0</span>
           <span>Deterministic · Reproducible · Auditable</span>
