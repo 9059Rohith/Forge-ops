@@ -1,0 +1,51 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      DATABASE_URL: sqlite+aiosqlite:////data/forgeguard.db
+      WORKSPACE_ROOT: /workspace
+      WORKSPACE_RETENTION_HOURS: ${WORKSPACE_RETENTION_HOURS:-0}
+      MAX_REPAIR_CYCLES: ${MAX_REPAIR_CYCLES:-2}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ALLOWED_REPOS: ${ALLOWED_REPOS:-}
+      ALLOWED_ORIGINS: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
+      BACKEND_URL: http://localhost:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_PRIVATE_KEY: ${GITHUB_PRIVATE_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      DODO_API_KEY: ${DODO_API_KEY:-}
+      DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-}
+      DODO_PRODUCT_DEVELOPER: ${DODO_PRODUCT_DEVELOPER:-}
+      DODO_PRODUCT_PRO: ${DODO_PRODUCT_PRO:-}
+      DODO_PRODUCT_TEAM: ${DODO_PRODUCT_TEAM:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+    ports: ["8000:8000"]
+    volumes:
+      - forgeguard-data:/data
+      - forgeguard-workspaces:/workspace
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      # Returned to the browser at request time, not compiled into the image.
+      BACKEND_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  forgeguard-data:
+  forgeguard-workspaces:

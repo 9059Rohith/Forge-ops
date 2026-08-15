@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, TriangleAlert } from "lucide-react";
+import { ArrowRight, ExternalLink, TriangleAlert } from "lucide-react";
 import type { FlightLog, TaskDetail, VerificationReceipt } from "@/lib/types";
 import { AgentGraph } from "@/components/AgentGraph";
 import { Brand } from "@/components/Brand";
@@ -11,6 +11,7 @@ import { ProofPackage } from "@/components/ProofPackage";
 import { ReviewerCard } from "@/components/ReviewerCard";
 import { RiskPanel } from "@/components/RiskPanel";
 import { StatusSummary } from "@/components/StatusSummary";
+import { AuthorizationCard } from "@/components/AuthorizationCard";
 
 interface Props {
   task: TaskDetail;
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function TaskDashboard({ task, logs, diff, proof, receipt }: Props) {
+  const mostSevere = [...task.evaluations].sort((a, b) => b.score - a.score)[0];
   return (
     <main className="min-h-screen bg-canvas px-3 pb-5 text-ink sm:px-5">
       <header className="mx-auto flex h-[62px] max-w-[1580px] items-center justify-between">
@@ -32,6 +34,25 @@ export function TaskDashboard({ task, logs, diff, proof, receipt }: Props) {
       </header>
       <div className="mx-auto max-w-[1580px] space-y-3">
         <StatusSummary task={task} />
+        {task.pr_url && (
+          <a
+            href={task.pr_url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between rounded-lg border border-mint/45 bg-mint/10 px-4 py-3 text-sm text-mint transition hover:bg-mint/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mint"
+          >
+            <span>Evidence-backed pull request #{task.pr_number} is ready for human review.</span>
+            <ExternalLink className="size-4" />
+          </a>
+        )}
+        {task.status === "awaiting_authorization" && (
+          <AuthorizationCard
+            taskId={task.id}
+            severity={mostSevere?.severity || task.risk_level || "review"}
+            summary={mostSevere?.finding || task.pending_plan || "A repair plan is ready to run."}
+            confidence={task.confidence_score}
+          />
+        )}
         {task.error_message && (
           <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/40 bg-danger/10 p-4 text-sm text-danger"><TriangleAlert className="mt-0.5 size-4 shrink-0" />{task.error_message}</div>
         )}

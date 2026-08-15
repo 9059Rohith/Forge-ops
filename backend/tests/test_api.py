@@ -113,3 +113,26 @@ async def test_proof_endpoint_includes_a_sealed_terminal_receipt(
     assert body["receipt"]["task"]["id"] == task_id
     assert body["receipt"]["decision"] == "VERIFIED"
     assert len(body["receipt"]["integrity"]["digest"]) == 64
+
+
+@pytest.mark.asyncio
+async def test_evidence_endpoint_returns_the_complete_persisted_chain(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+    created = await client.post(
+        "/api/tasks",
+        json={"repo_url": "demo", "branch": "main", "description": "Add safe retries"},
+    )
+    task_id = created.json()["task_id"]
+
+    response = await client.get(f"/api/jobs/{task_id}/evidence")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["job"]["id"] == task_id
+    assert body["findings"] == []
+    assert body["credit_usage"] is None
+    assert "audit_log" in body

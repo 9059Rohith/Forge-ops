@@ -2,6 +2,7 @@ import { ShieldCheck } from "lucide-react";
 import { Brand } from "@/components/Brand";
 import { TaskForm } from "@/components/TaskForm";
 import { WorkflowRail } from "@/components/WorkflowRail";
+import { RepairCreditsCard } from "@/components/RepairCreditsCard";
 
 export default function HomePage() {
   return (
@@ -21,7 +22,7 @@ export default function HomePage() {
               Give an agent a task. ForgeGuard builds the patch, challenges it, repairs it, and returns evidence you can trust.
             </p>
           </div>
-          <div className="w-full lg:max-w-[647px]"><TaskForm /></div>
+          <div className="w-full space-y-3 lg:max-w-[647px]"><TaskForm /><RepairCreditsCard /></div>
         </section>
         <section className="mx-auto mt-14 max-w-[1372px] lg:mt-14">
           <WorkflowRail />

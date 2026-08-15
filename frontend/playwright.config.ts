@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const e2eDatabaseUrl = `sqlite+aiosqlite:///./e2e-${process.pid}.db`;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 90_000,
@@ -14,14 +16,14 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "python -m uvicorn app.main:app --host 127.0.0.1 --port 8765",
+      command: "alembic upgrade head && python -m uvicorn app.main:app --host 127.0.0.1 --port 8765",
       cwd: "../backend",
       url: "http://127.0.0.1:8765/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       env: {
         DEMO_MODE: "true",
-        DATABASE_URL: "sqlite+aiosqlite:///./e2e.db",
+        DATABASE_URL: e2eDatabaseUrl,
         ALLOWED_ORIGINS: "http://127.0.0.1:3000",
       },
     },

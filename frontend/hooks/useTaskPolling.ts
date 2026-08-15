@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getDiff, getFlightLog, getProof, getTask } from "@/lib/api";
 import type { FlightLog, TaskDetail, VerificationReceipt } from "@/lib/types";
 
-const TERMINAL = new Set(["verified", "failed"]);
+const TERMINAL = new Set(["verified", "failed", "awaiting_authorization", "manual_review_required"]);
 
 export function useTaskPolling(taskId: string, intervalMs = 1500) {
   const [task, setTask] = useState<TaskDetail | null>(null);

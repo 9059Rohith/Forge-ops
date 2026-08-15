@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import billing.models  # noqa: F401  # Register billing tables with shared metadata.
 from app.config import get_settings
 from app.models import Base
 

@@ -10,7 +10,7 @@
 
 [![Backend](https://img.shields.io/badge/backend-FastAPI-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
 [![Frontend](https://img.shields.io/badge/frontend-Next.js-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
-[![Tests](https://img.shields.io/badge/tests-58%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
+[![Tests](https://img.shields.io/badge/tests-85%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
 [![Demo](https://img.shields.io/badge/demo-no%20API%20keys%20required-64e6bd?style=flat-square&labelColor=0b141c)](#run-the-live-demo)
 [![Evidence](https://img.shields.io/badge/evidence-SHA--256%20sealed-64e6bd?style=flat-square&labelColor=0b141c)](#tamper-evident-verification-receipt)
 
@@ -63,8 +63,25 @@ That is the whole product in one sentence. The deterministic demo adds valid exp
 - **Flight recorder** — every state transition, agent run, write, test, review, block, repair, and verdict is timestamped.
 - **Proof package** — concise Markdown for humans, suitable for a pull request or audit note.
 - **Verification receipt** — portable JSON with artifact hashes and a deterministic ForgeGuard receipt ID.
+- **Repair Credits** — Dodo-backed, atomic one-job entitlements with idempotent usage and narrowly defined refunds.
+- **Signed GitHub automation** — size-limited, allowlisted push webhooks create repair jobs only after HMAC verification.
 - **Two execution modes** — a zero-key deterministic showcase and provider-backed work on real repositories.
-- **Production-shaped delivery** — FastAPI, async SQLite, Next.js, Docker, Render, Vercel, CI, and responsive browser tests.
+- **Production-shaped delivery** — Alembic, FastAPI, async SQLite/Postgres, Next.js, non-root Docker images, Compose, Render, and SHA-tagged CI releases.
+
+## Repair Credits: one job, one authorization
+
+Repair Credits are not pay-per-agent-call billing. A credit authorizes one autonomous repair **job** after a plan exists and before the Repair agent writes. Every bounded retry under `MAX_REPAIR_CYCLES` reuses that reservation.
+
+| Plan | Monthly credits |
+|---|---:|
+| Free | 3 |
+| Developer | 50 |
+| Pro | 150 |
+| Team | 500 |
+
+Reservations use an atomic conditional database update, while a unique job-usage row prevents duplicate webhook deliveries or concurrent requests from charging twice. A crash before any repair cycle starts refunds the credit; failed repair cycles and exhausted retries consume it. When no credit is available, ForgeGuard preserves the plan as `awaiting_authorization` and shows an actionable authorization card instead of dropping the finding.
+
+The payment adapter follows Dodo's current hosted Checkout Session flow and Standard Webhooks signature format. Product IDs and credentials are environment-only; see [the focused billing contract](backend/billing/README.md).
 
 ## Architecture
 
@@ -73,6 +90,7 @@ flowchart LR
     U[Developer] -->|repository + task| UI[Next.js dashboard]
     UI -->|typed REST| API[FastAPI control plane]
     API <--> DB[(Async SQLite)]
+    API <--> BILL[Dodo Checkout + signed webhooks]
     API --> WT[Isolated Git worktree]
 
     WT --> ENG[Engineer]
@@ -89,6 +107,7 @@ flowchart LR
     ADV --> RISK
 
     RISK -->|blocked| FIX[Scoped Repair]
+    BILL -->|reserve 1 job credit| FIX
     FIX --> DIFF
     RISK -->|verified| PROOF[Proof package]
     PROOF --> SEAL[SHA-256 receipt]
@@ -107,9 +126,9 @@ stateDiagram-v2
     Reviewing --> Blocked: confidence < 75 or any critical finding
     Blocked --> Repairing: repair cycles remaining
     Repairing --> Reviewing: new diff + full re-verification
-    Blocked --> Failed: repair limit exhausted
+    Blocked --> ManualReview: repair limit exhausted
     Verified --> [*]
-    Failed --> [*]
+    ManualReview --> [*]
 ```
 
 ### What happens during the showcase
@@ -216,7 +235,18 @@ This is an integrity seal, not a cryptographic identity signature. A future rele
 - npm
 - Git
 
-### 1. Start the backend
+### Fastest path: Docker Compose
+
+```bash
+copy .env.example .env
+docker compose up --build
+```
+
+On macOS/Linux, use `cp`. Open [http://localhost:3000](http://localhost:3000). The API applies `alembic upgrade head`, persists SQLite, exposes `/healthz` and `/readyz`, and the dashboard discovers `BACKEND_URL` at runtime.
+
+### Run from source
+
+#### 1. Start the backend
 
 ```bash
 cd backend
@@ -230,6 +260,7 @@ python -m venv .venv
 
 pip install -r requirements-dev.txt
 copy .env.example .env
+alembic upgrade head
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -237,7 +268,7 @@ For macOS/Linux, replace `copy` with `cp`.
 
 The safe template defaults to `DEMO_MODE=true`; the showcase requires no provider keys.
 
-### 2. Start the dashboard
+#### 2. Start the dashboard
 
 ```bash
 cd frontend
@@ -248,7 +279,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### 3. Use the exact showcase input
+#### 3. Use the exact showcase input
 
 | Field | Value |
 |---|---|
@@ -266,7 +297,12 @@ Keep secrets only in `backend/.env`:
 DEMO_MODE=false
 OPENAI_API_KEY=
 GROQ_API_KEY=
-GITHUB_TOKEN=
+GITHUB_APP_ID=
+GITHUB_PRIVATE_KEY=
+GITHUB_WEBHOOK_SECRET=
+DODO_API_KEY=
+DODO_WEBHOOK_SECRET=
+SESSION_SECRET=
 ```
 
 Then submit either a local repository path or an HTTPS GitHub URL. The browser never receives provider credentials. Webhook signing is optional for the current task API and can be configured later with `GITHUB_WEBHOOK_SECRET`.
@@ -286,6 +322,14 @@ Interactive documentation is available at `http://localhost:8000/api/docs`.
 | `GET` | `/api/tasks/{id}/diff` | Captured staged Git diff |
 | `GET` | `/api/tasks/{id}/proof` | Markdown proof plus nullable sealed receipt |
 | `POST` | `/api/tasks/{id}/repair` | Manual retry for an eligible blocked task |
+| `GET` | `/api/jobs/{id}/evidence` | Complete findings, plan, diff, tests, verdict, audit, and credit chain |
+| `POST` | `/api/webhooks/github` | Verify a GitHub push webhook and create a repair job |
+| `GET` | `/api/billing/status/{user_id}` | Plan, usage, balance, and reset date |
+| `POST` | `/api/billing/checkout` | Create a hosted Dodo subscription checkout |
+| `POST` | `/api/billing/webhook` | Verify and apply Dodo subscription events |
+| `GET` | `/api/repairs/{id}/authorization` | Inspect a paused repair and available credits |
+| `POST` | `/api/repairs/{id}/authorize` | Reserve one credit and resume a paused repair |
+| `GET` | `/healthz` / `/readyz` | Liveness and database/config readiness |
 
 Example task request:
 
@@ -312,7 +356,9 @@ forgeguard/
 │   │   ├── db.py             # Async SQLAlchemy session boundary
 │   │   ├── models.py         # Persisted projects, tasks, runs, evidence
 │   │   └── schemas.py        # Validated external and agent contracts
-│   └── tests/                # Unit, API, orchestration, and safety tests
+│   ├── billing/              # Dodo adapter, entitlement service, models, API
+│   ├── migrations/           # Single additive Alembic chain
+│   └── tests/                # Unit, API, orchestration, billing, and safety tests
 ├── frontend/
 │   ├── app/                  # Next.js App Router surfaces
 │   ├── components/           # Dashboard, graph, reviews, diff, proof
@@ -327,6 +373,8 @@ forgeguard/
 │   ├── qa/                   # Browser evidence and fidelity ledger
 │   └── superpowers/          # Design specifications and implementation plans
 ├── .github/workflows/ci.yml
+├── docker-compose.yml
+├── DEPLOYMENT.md
 ├── render.yaml
 └── README.md
 ```
@@ -374,7 +422,10 @@ Current controls include:
 - model output is parsed through strict JSON contracts with deadlines and one retry;
 - stored provider and command output is bounded;
 - unhandled orchestration errors persist a terminal failure state;
-- blocked worktrees are preserved when useful forensic evidence exists.
+- job worktrees use unique `forgeguard/repair-{job_id}` branches and are removed by default; an explicit retention window preserves them for debugging;
+- writes to `main`, `master`, and `production` are rejected at runtime;
+- GitHub and Dodo webhooks are HMAC-verified against the exact raw payload, size-limited, and rate-limited;
+- Repair Credit reservations are atomic and unique per job.
 
 ForgeGuard is currently a controlled hackathon service, not a public multi-tenant SaaS. Authentication, tenant isolation, signed identities, and remote execution sandboxes belong in the production roadmap.
 
@@ -382,9 +433,9 @@ ForgeGuard is currently a controlled hackathon service, not a public multi-tenan
 
 | Layer | Coverage | Command |
 |---|---:|---|
-| Backend | 44 tests | `cd backend && python -m pytest` |
+| Backend | 72 tests | `cd backend && python -m pytest` |
 | Python quality | Ruff rules | `cd backend && python -m ruff check app tests` |
-| Frontend | 7 tests | `cd frontend && npm test -- --run` |
+| Frontend | 10 tests | `cd frontend && npm test -- --run` |
 | Frontend types | TypeScript | `cd frontend && npm run typecheck` |
 | Production bundle | Next.js | `cd frontend && npm run build` |
 | Full browser flow | 4 desktop/mobile journeys | `cd frontend && npm run test:e2e` |
@@ -396,7 +447,7 @@ Run the complete local gate:
 ```bash
 cd backend
 python -m pytest
-python -m ruff check app tests
+python -m ruff check app billing tests
 
 cd ../frontend
 npm test -- --run
@@ -412,9 +463,11 @@ python -m pytest
 
 ## Deployment
 
+The complete operator runbook is [DEPLOYMENT.md](DEPLOYMENT.md). It covers Compose, SQLite/Postgres URLs, migrations, GitHub App permissions, Dodo products and webhooks, Render, CI/CD, secret provisioning, and a judge-ready walkthrough.
+
 ### Render backend
 
-Create a Blueprint from this repository. [`render.yaml`](render.yaml) builds the non-root backend container, mounts persistent SQLite storage, and checks `/api/health`.
+Create a Blueprint from this repository. [`render.yaml`](render.yaml) builds non-root API and dashboard containers, mounts persistent SQLite storage, and checks `/readyz`.
 
 Configure these secrets in Render, never in Git:
 
@@ -424,13 +477,7 @@ Configure these secrets in Render, never in Git:
 - `GITHUB_WEBHOOK_SECRET` when webhook ingestion is added
 - `ALLOWED_ORIGINS` set to the deployed frontend origin
 
-### Vercel frontend
-
-Import the repository, set the Root Directory to `frontend`, and configure:
-
-```dotenv
-NEXT_PUBLIC_API_URL=https://forgeguard-api.example.com
-```
+The dashboard reads `BACKEND_URL` through a runtime route, so the same image can move between Compose, staging, and production without rebuilding. For multi-instance production, switch `DATABASE_URL` to `postgresql+asyncpg://…`.
 
 ## How Codex was used
 
@@ -459,7 +506,7 @@ The product mirrors those same disciplines for every autonomous patch: isolate, 
 ## Roadmap
 
 - Sign receipt digests through Sigstore or a cloud KMS.
-- Create pull requests with proof attached as a check run.
+- Publish the proof package as a GitHub check run in addition to the evidence-backed PR body.
 - Add policy-as-code for repository-specific risk thresholds.
 - Run untrusted builds in ephemeral remote sandboxes.
 - Add authenticated teams, approval gates, and evidence retention policies.

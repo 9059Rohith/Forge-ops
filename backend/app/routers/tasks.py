@@ -14,6 +14,8 @@ from app.core.proof_package import build_verification_receipt
 from app.db import get_db
 from app.models import Project, Task
 from app.schemas import ProofView, TaskCreate, TaskCreated
+from billing.models import User
+from billing.service import ensure_demo_user
 
 router = APIRouter(tags=["tasks"])
 _running_tasks: set[asyncio.Task[None]] = set()
@@ -46,6 +48,7 @@ def _serialize_task(task: Task) -> dict[str, Any]:
     order = {"security": 0, "scope": 1, "adversarial": 2}
     return {
         "id": task.id,
+        "user_id": task.user_id,
         "description": task.description,
         "status": task.status,
         "risk_level": task.risk_level,
@@ -55,11 +58,16 @@ def _serialize_task(task: Task) -> dict[str, Any]:
         "tests_total": task.tests_total,
         "changed_files": task.changed_files,
         "error_message": task.error_message,
+        "pending_plan": task.pending_plan,
+        "repair_branch": task.repair_branch,
+        "pr_url": task.pr_url,
+        "pr_number": task.pr_number,
         "created_at": task.created_at.isoformat(),
         "updated_at": task.updated_at.isoformat(),
         "project": {
             "id": task.project.id,
             "repo_url": task.project.repo_url,
+            "repo_full_name": task.project.repo_full_name,
             "branch": task.project.branch,
             "created_at": task.project.created_at.isoformat(),
         },
@@ -90,6 +98,12 @@ def _serialize_task(task: Task) -> dict[str, Any]:
 
 @router.post("", response_model=TaskCreated, status_code=status.HTTP_202_ACCEPTED)
 async def create_task(payload: TaskCreate, session: AsyncSession = Depends(get_db)):
+    if payload.user_id:
+        user = await session.get(User, payload.user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+    else:
+        user = await ensure_demo_user(session)
     result = await session.execute(
         select(Project).where(
             Project.repo_url == payload.repo_url,
@@ -101,7 +115,7 @@ async def create_task(payload: TaskCreate, session: AsyncSession = Depends(get_d
         project = Project(repo_url=payload.repo_url, branch=payload.branch)
         session.add(project)
         await session.flush()
-    task = Task(project_id=project.id, description=payload.description)
+    task = Task(project_id=project.id, user_id=user.id, description=payload.description)
     session.add(task)
     await session.commit()
     schedule_task(task.id)

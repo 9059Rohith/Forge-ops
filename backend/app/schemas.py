@@ -9,13 +9,14 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 BRANCH_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,119}$")
-TERMINAL_STATUSES = {"verified", "failed"}
+TERMINAL_STATUSES = {"verified", "failed", "manual_review_required"}
 
 
 class TaskCreate(BaseModel):
     repo_url: str = Field(min_length=1, max_length=500)
     branch: str = Field(default="main", min_length=1, max_length=120)
     description: str = Field(min_length=3, max_length=10_000)
+    user_id: str | None = None
 
     @field_validator("repo_url", "branch", "description", mode="before")
     @classmethod
@@ -60,6 +61,7 @@ class ProjectView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
     repo_url: str
+    repo_full_name: str | None
     branch: str
     created_at: datetime
 
@@ -102,6 +104,9 @@ class TaskView(BaseModel):
     tests_total: int
     changed_files: list[str]
     error_message: str | None
+    repair_branch: str | None
+    pr_url: str | None
+    pr_number: int | None
     created_at: datetime
     updated_at: datetime
     project: ProjectView

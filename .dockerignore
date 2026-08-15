@@ -8,6 +8,4 @@
 **/.next
 .forgeguard-work
 docs
-frontend
 !demo-repo
-

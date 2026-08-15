@@ -4,13 +4,15 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
-    healthCheckPath: /api/health
+    healthCheckPath: /readyz
     autoDeploy: true
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
         value: sqlite+aiosqlite:////data/forgeguard.db
+      - key: WORKSPACE_ROOT
+        value: /workspace
       - key: DEMO_MODE
         value: "true"
       - key: MAX_REPAIR_CYCLES
@@ -23,6 +25,22 @@ services:
         sync: false
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_PRIVATE_KEY
+        sync: false
+      - key: DODO_API_KEY
+        sync: false
+      - key: DODO_WEBHOOK_SECRET
+        sync: false
+      - key: DODO_PRODUCT_DEVELOPER
+        sync: false
+      - key: DODO_PRODUCT_PRO
+        sync: false
+      - key: DODO_PRODUCT_TEAM
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
       - key: ALLOWED_ORIGINS
         sync: false
     disk:
@@ -30,3 +48,13 @@ services:
       mountPath: /data
       sizeGB: 1
 
+  - type: web
+    name: forgeguard-dashboard
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: BACKEND_URL
+        sync: false

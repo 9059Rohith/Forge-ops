@@ -10,6 +10,8 @@ const statusColors: Record<string, string> = {
   repairing: "text-amber",
   verified: "text-mint",
   failed: "text-danger",
+  awaiting_authorization: "text-amber",
+  manual_review_required: "text-danger",
 };
 
 function Metric({ label, children }: { label: string; children: React.ReactNode }) {
@@ -34,4 +36,3 @@ export function StatusSummary({ task }: { task: TaskDetail }) {
     </section>
   );
 }
-

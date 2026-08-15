@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Any
@@ -29,9 +30,14 @@ from app.core.repository import apply_file_changes
 from app.core.risk_engine import compute_risk
 from app.core.worktree import Worktree, WorktreeManager
 from app.db import session_scope
+from app.integrations.github_app import create_pull_request, get_installation_token
 from app.models import AgentRun, Evaluation, FlightLog, Task, utcnow
 from app.providers.groq_client import create_groq_provider
 from app.providers.openai_client import create_openai_provider
+from billing.entitlement_service import EntitlementService
+from billing.service import ensure_demo_user
+
+logger = logging.getLogger(__name__)
 
 
 async def _load_task(task_id: str) -> Task:
@@ -114,6 +120,27 @@ def _providers():
     return openai, groq
 
 
+def _github_access_token(task: Task) -> str | None:
+    settings = get_settings()
+    if settings.github_token:
+        return settings.github_token
+    if (
+        task.project.github_installation_id
+        and settings.github_app_id
+        and settings.github_private_key
+    ):
+        return get_installation_token(
+            settings.github_app_id,
+            settings.github_private_key,
+            task.project.github_installation_id,
+        )
+    if settings.environment == "production" and task.project.repo_url.startswith(
+        "https://github.com/"
+    ):
+        raise RuntimeError("GitHub App installation ID is required to publish the repair PR")
+    return None
+
+
 async def _engineer(task: Task, worktree: Worktree) -> dict[str, Any]:
     settings = get_settings()
     if settings.demo_mode or task.project.repo_url == "demo":
@@ -185,12 +212,23 @@ async def _review(
 
 async def run_task(task_id: str) -> None:
     settings = get_settings()
+    manager: WorktreeManager | None = None
+    worktree: Worktree | None = None
+    github_token: str | None = None
     try:
         task = await _load_task(task_id)
+        if task.user_id is None and (settings.demo_mode or task.project.repo_url == "demo"):
+            async with session_scope() as session:
+                demo_user = await ensure_demo_user(session)
+            await _update_task(task_id, user_id=demo_user.id)
+            task = await _load_task(task_id)
         await record_event(task_id, "Task received")
         await _update_task(task_id, status="planning", error_message=None)
         await record_event(task_id, "Repository reconnaissance complete")
 
+        github_token = await asyncio.to_thread(_github_access_token, task)
+        repair_branch = f"forgeguard/repair-{task_id}"
+        await _update_task(task_id, repair_branch=repair_branch)
         manager = WorktreeManager(settings.work_root)
         worktree = await asyncio.to_thread(
             manager.create,
@@ -198,6 +236,7 @@ async def run_task(task_id: str) -> None:
             task.project.repo_url,
             task.project.branch,
             settings.demo_repo_path,
+            github_token,
         )
         await _update_task(task_id, worktree_path=str(worktree.path))
         await record_event(task_id, "Worktree created")
@@ -217,6 +256,7 @@ async def run_task(task_id: str) -> None:
             task_id,
             diff_text=diff,
             changed_files_json=json.dumps(changed_files),
+            pending_plan=str(result.get("plan", ""))[:8_000] or None,
         )
         await record_event(task_id, f"Patch captured ({len(changed_files)} files)")
 
@@ -263,12 +303,29 @@ async def run_task(task_id: str) -> None:
                     repair_cycles=task.repair_cycles,
                     decision="VERIFIED",
                 )
-                await _finalize_task(
-                    task_id,
-                    "PR verified",
-                    status="verified",
-                    proof_text=proof,
-                )
+                final_values: dict[str, Any] = {"status": "verified", "proof_text": proof}
+                final_event = "PR verified"
+                if github_token and task.project.repo_url.startswith("https://github.com/"):
+                    repo_full_name = task.project.repo_full_name
+                    if not repo_full_name:
+                        raise RuntimeError("GitHub repository full_name is required to create a PR")
+                    await asyncio.to_thread(
+                        worktree.commit_and_push, repair_branch, github_token
+                    )
+                    published = await asyncio.to_thread(
+                        create_pull_request,
+                        token=github_token,
+                        repo_full_name=repo_full_name,
+                        base_branch=task.project.branch,
+                        repair_branch=repair_branch,
+                        title=f"ForgeGuard repair: {task.description[:120]}",
+                        body=proof,
+                    )
+                    final_values.update(pr_url=published.url, pr_number=published.number)
+                    final_event = f"PR created: {published.url}"
+                await _finalize_task(task_id, final_event, **final_values)
+                async with session_scope() as session:
+                    await EntitlementService(session).record_repair_outcome(task_id, "completed")
                 break
 
             await _update_task(task_id, status="blocked")
@@ -288,11 +345,40 @@ async def run_task(task_id: str) -> None:
                 await _finalize_task(
                     task_id,
                     "Max repair attempts reached — worktree preserved for inspection",
-                    status="failed",
+                    status="manual_review_required",
                     proof_text=proof,
-                    error_message="Maximum repair attempts reached; worktree preserved for inspection.",
+                    error_message="Maximum repair attempts reached; human review is required.",
                 )
+                async with session_scope() as session:
+                    await EntitlementService(session).record_repair_outcome(
+                        task_id, "cycle_failed"
+                    )
                 break
+
+            if not task.user_id:
+                await _update_task(
+                    task_id,
+                    status="awaiting_authorization",
+                    error_message="Repair is ready but this job has no billing owner.",
+                )
+                await record_event(task_id, "Repair awaiting authorization")
+                break
+            async with session_scope() as session:
+                entitlement = await EntitlementService(session).reserve_for_job(
+                    task.user_id, task_id
+                )
+            if not entitlement.has_credit:
+                await _update_task(
+                    task_id,
+                    status="awaiting_authorization",
+                    error_message="Repair plan ready — add a Repair Credit to continue.",
+                )
+                await record_event(task_id, "Repair awaiting authorization")
+                break
+            await record_event(
+                task_id,
+                f"Repair credit authorized ({entitlement.credits_remaining} remaining)",
+            )
 
             cycle = task.repair_cycles + 1
             await _update_task(task_id, status="repairing", repair_cycles=cycle)
@@ -314,7 +400,24 @@ async def run_task(task_id: str) -> None:
     except Exception as exc:
         public_error = f"{type(exc).__name__}: {str(exc)[:500]}"
         try:
+            failed_task = await _load_task(task_id)
+            async with session_scope() as session:
+                if failed_task.repair_cycles == 0:
+                    await EntitlementService(session).record_repair_outcome(
+                        task_id, "pre_repair_failure"
+                    )
+                else:
+                    await EntitlementService(session).record_repair_outcome(
+                        task_id, "system_failed"
+                    )
             await _update_task(task_id, status="failed", error_message=public_error)
             await record_event(task_id, f"Task failed: {public_error}")
         except Exception:
             return
+    finally:
+        if manager and worktree and settings.workspace_retention_hours == 0:
+            try:
+                await asyncio.to_thread(manager.remove, worktree)
+                await _update_task(task_id, worktree_path=None)
+            except Exception:
+                logger.warning("Unable to clean task worktree %s", task_id, exc_info=True)

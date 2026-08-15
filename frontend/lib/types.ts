@@ -4,6 +4,8 @@ export type TaskStatus =
   | "engineering"
   | "reviewing"
   | "blocked"
+  | "awaiting_authorization"
+  | "manual_review_required"
   | "repairing"
   | "verified"
   | "failed";
@@ -11,6 +13,7 @@ export type TaskStatus =
 export interface Project {
   id: string;
   repo_url: string;
+  repo_full_name?: string | null;
   branch: string;
   created_at: string;
 }
@@ -75,6 +78,7 @@ export interface VerificationReceipt {
 
 export interface TaskDetail {
   id: string;
+  user_id: string | null;
   description: string;
   status: TaskStatus;
   risk_level: "LOW" | "MEDIUM" | "HIGH" | null;
@@ -84,6 +88,10 @@ export interface TaskDetail {
   tests_total: number;
   changed_files: string[];
   error_message: string | null;
+  pending_plan: string | null;
+  repair_branch?: string | null;
+  pr_url?: string | null;
+  pr_number?: number | null;
   created_at: string;
   updated_at: string;
   project: Project;
@@ -95,5 +103,22 @@ export interface TaskInput {
   repo_url: string;
   branch: string;
   description: string;
+}
+
+export interface BillingStatus {
+  user_id: string;
+  plan: "free" | "developer" | "pro" | "team";
+  subscription_status: "active" | "past_due" | "canceled";
+  credits_remaining: number;
+  credits_used: number;
+  credits_total: number;
+  period_end: string | null;
+}
+
+export interface RepairAuthorization {
+  task_id: string;
+  awaiting_authorization: boolean;
+  credits_remaining: number;
+  pending_plan: string | null;
 }
 

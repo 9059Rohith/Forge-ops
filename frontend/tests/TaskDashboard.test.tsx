@@ -10,6 +10,7 @@ import type { TaskDetail, VerificationReceipt } from "@/lib/types";
 
 const task: TaskDetail = {
   id: "task-1",
+  user_id: "user-1",
   description: "Add retry handling",
   status: "verified",
   risk_level: "LOW",
@@ -19,6 +20,7 @@ const task: TaskDetail = {
   tests_total: 5,
   changed_files: ["checkout.py", "tests/test_checkout.py"],
   error_message: null,
+  pending_plan: null,
   created_at: "2026-08-15T10:12:31Z",
   updated_at: "2026-08-15T10:14:02Z",
   project: { id: "p1", repo_url: "demo", branch: "main", created_at: "2026-08-15T10:12:31Z" },
