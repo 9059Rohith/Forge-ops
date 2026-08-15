@@ -16,7 +16,7 @@
 - Never print, commit, or send provider credentials to the browser.
 - Keep the existing `markdown` proof response field backwards-compatible.
 - Use deterministic canonical JSON with sorted keys and compact separators.
-- The receipt ID is `fg_` plus the first 16 hexadecimal characters of the payload SHA-256.
+- The receipt ID is `fg_` plus the first 16 hexadecimal characters of the evidence payload SHA-256; derived `receipt_id` and `integrity` fields are excluded from that hash input.
 - Implement behavior changes test-first and observe the expected failure before production edits.
 
 ---
@@ -36,7 +36,7 @@
 
 - [ ] **Step 1: Write the failing deterministic-builder test**
 
-  Add a test that calls `build_verification_receipt` twice with the same literal evidence and asserts identical dictionaries, `schema_version == "1.0"`, `receipt_id` matches `^fg_[0-9a-f]{16}$`, diff/proof hashes equal hand-computed `hashlib.sha256(...).hexdigest()` values, and `integrity.digest` equals a fresh hash of the returned payload after removing `integrity`.
+  Add a test that calls `build_verification_receipt` twice with the same literal evidence and asserts identical dictionaries, `schema_version == "1.0"`, `receipt_id` matches `^fg_[0-9a-f]{16}$`, diff/proof hashes equal hand-computed `hashlib.sha256(...).hexdigest()` values, and `integrity.digest` equals a fresh hash of the returned evidence payload after removing the derived `receipt_id` and `integrity` fields.
 
 - [ ] **Step 2: Run the focused proof test and confirm RED**
 

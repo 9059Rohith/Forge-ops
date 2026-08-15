@@ -45,7 +45,7 @@ The backend will derive a machine-readable receipt from persisted task evidence.
 - SHA-256 digests of the captured diff and Markdown proof;
 - an integrity block containing the canonical payload digest.
 
-The receipt ID will be the `fg_` prefix plus the first 16 hexadecimal characters of the canonical SHA-256 digest. Canonical JSON uses sorted keys and compact separators. The digest excludes the integrity block so rebuilding the same receipt from the same evidence is deterministic.
+The receipt ID will be the `fg_` prefix plus the first 16 hexadecimal characters of the canonical SHA-256 digest. Canonical JSON uses sorted keys and compact separators. The digest covers the evidence payload before the derived `receipt_id` and `integrity` fields are attached, avoiding a self-referential hash while keeping rebuilding deterministic.
 
 `GET /api/tasks/{task_id}/proof` will preserve the existing `markdown` field and add a nullable `receipt` field. Before proof exists, `receipt` is `null`; terminal proof responses include the complete receipt. This keeps the polling API backwards-compatible and avoids adding another request to every refresh cycle.
 
