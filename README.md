@@ -20,6 +20,17 @@ Codex can write the code. ForgeGuard makes autonomous coding accountable.
 
 ---
 
+## Live deployment
+
+| Service | URL |
+|---|---|
+| Frontend dashboard | [forge-ops-eight.vercel.app](https://forge-ops-eight.vercel.app/) |
+| Backend API | [forge-ops.onrender.com](https://forge-ops.onrender.com/) |
+| API health | [forge-ops.onrender.com/healthz](https://forge-ops.onrender.com/healthz) |
+| Interactive API docs | [forge-ops.onrender.com/api/docs](https://forge-ops.onrender.com/api/docs) |
+
+The backend root intentionally has no HTML page; use the dashboard, health endpoint, or API documentation above.
+
 ## The problem in 60 seconds
 
 An AI coding agent can return a convincing patch and a green test suite while quietly weakening authorization, changing a public contract, or touching files outside the task. Passing tests prove that selected behaviors still work. They do **not** prove that the change is safe, scoped, or ready to ship.
