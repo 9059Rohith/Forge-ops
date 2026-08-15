@@ -6,7 +6,7 @@
 
 **Architecture:** Receipt construction is a pure backend function that hashes a canonical JSON payload and is exposed through the existing proof endpoint. The frontend consumes that payload through the existing polling request and renders a compact identity/download control inside the existing proof surface. Documentation remains repository-native Markdown with Mermaid diagrams and local raster assets.
 
-**Tech Stack:** Python 3.11+, FastAPI, SQLAlchemy, SHA-256/JSON standard library, pytest, Next.js 14, React 18, TypeScript, Vitest, Testing Library, Playwright, Markdown, Mermaid, Image Gen.
+**Tech Stack:** Python 3.11+, FastAPI, SQLAlchemy, SHA-256/JSON standard library, pytest, Next.js 16, React 19, TypeScript, Vitest, Testing Library, Playwright, Markdown, Mermaid, Image Gen.
 
 ## Global Constraints
 

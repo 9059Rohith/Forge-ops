@@ -47,5 +47,6 @@ Upgrade QA date: 2026-08-15
 - **Typography and palette:** all new receipt text uses the existing mono chrome scale; mint indicates verified integrity, muted slate carries supporting copy, and no new gradient, glow, radius, or shadow token was introduced.
 - **Responsive behavior:** proof actions wrap instead of overflowing, the receipt ID remains legible, and both Pixel 7 Playwright journeys complete the download flow without page-level horizontal overflow.
 - **Interaction evidence:** desktop and mobile runs both reached `VERIFIED`, displayed a 16-hex ForgeGuard receipt ID, downloaded JSON, and confirmed the downloaded ID matches the visible seal.
+- **Framework migration:** the Next.js 16 development indicator was removed from the presentation surface; final native-size captures contain no framework or QA overlays.
 
 The proof-header addition is an intentional functional extension requested by the hackathon upgrade. Direct `view_image` comparison of both accepted concepts and both fresh renders found no material mismatch requiring further visual repair. The implementation remains agency-signoff faithful to the accepted ForgeGuard design system.

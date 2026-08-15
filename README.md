@@ -212,7 +212,7 @@ This is an integrity seal, not a cryptographic identity signature. A future rele
 ### Requirements
 
 - Python 3.11+
-- Node.js 20+
+- Node.js 20.9+
 - npm
 - Git
 
