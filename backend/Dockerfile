@@ -28,7 +28,8 @@ COPY backend/alembic.ini ./alembic.ini
 COPY demo-repo ./demo-repo
 
 RUN useradd --create-home --uid 10001 forgeguard \
-    && chown -R forgeguard:forgeguard /app /tmp
+    && mkdir -p /data /workspace \
+    && chown -R forgeguard:forgeguard /app /data /workspace /tmp
 USER forgeguard
 
 EXPOSE 8000

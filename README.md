@@ -10,7 +10,7 @@
 
 [![Backend](https://img.shields.io/badge/backend-FastAPI-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
 [![Frontend](https://img.shields.io/badge/frontend-Next.js-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
-[![Tests](https://img.shields.io/badge/tests-85%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
+[![Tests](https://img.shields.io/badge/tests-91%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
 [![Demo](https://img.shields.io/badge/demo-no%20API%20keys%20required-64e6bd?style=flat-square&labelColor=0b141c)](#run-the-live-demo)
 [![Evidence](https://img.shields.io/badge/evidence-SHA--256%20sealed-64e6bd?style=flat-square&labelColor=0b141c)](#tamper-evident-verification-receipt)
 
@@ -66,7 +66,7 @@ That is the whole product in one sentence. The deterministic demo adds valid exp
 - **Repair Credits** — Dodo-backed, atomic one-job entitlements with idempotent usage and narrowly defined refunds.
 - **Signed GitHub automation** — size-limited, allowlisted push webhooks create repair jobs only after HMAC verification.
 - **Two execution modes** — a zero-key deterministic showcase and provider-backed work on real repositories.
-- **Production-shaped delivery** — Alembic, FastAPI, async SQLite/Postgres, Next.js, non-root Docker images, Compose, Render, and SHA-tagged CI releases.
+- **Production-shaped delivery** — Alembic, FastAPI, async SQLite/Postgres, Next.js, non-root Docker images, Compose, Vercel + Render manifests, and SHA-tagged CI releases.
 
 ## Repair Credits: one job, one authorization
 
@@ -433,14 +433,14 @@ ForgeGuard is currently a controlled hackathon service, not a public multi-tenan
 
 | Layer | Coverage | Command |
 |---|---:|---|
-| Backend | 72 tests | `cd backend && python -m pytest` |
-| Python quality | Ruff rules | `cd backend && python -m ruff check app tests` |
-| Frontend | 10 tests | `cd frontend && npm test -- --run` |
+| Backend | 78 tests | `cd backend && python -m pytest` |
+| Python quality | Ruff rules | `cd backend && python -m ruff check app billing tests` |
+| Frontend | 10 tests | `cd frontend && npm test` |
 | Frontend types | TypeScript | `cd frontend && npm run typecheck` |
 | Production bundle | Next.js | `cd frontend && npm run build` |
 | Full browser flow | 4 desktop/mobile journeys | `cd frontend && npm run test:e2e` |
 | Demo repository | 3 tests | `cd demo-repo && python -m pytest` |
-| Container | Backend image | `docker build -f backend/Dockerfile -t forgeguard-api .` |
+| Containers | Backend + frontend images | `docker compose build` |
 
 Run the complete local gate:
 
@@ -450,7 +450,7 @@ python -m pytest
 python -m ruff check app billing tests
 
 cd ../frontend
-npm test -- --run
+npm test
 npm run lint
 npm run typecheck
 npm run build
@@ -465,19 +465,21 @@ python -m pytest
 
 The complete operator runbook is [DEPLOYMENT.md](DEPLOYMENT.md). It covers Compose, SQLite/Postgres URLs, migrations, GitHub App permissions, Dodo products and webhooks, Render, CI/CD, secret provisioning, and a judge-ready walkthrough.
 
-### Render backend
+### Vercel frontend + Render backend
 
-Create a Blueprint from this repository. [`render.yaml`](render.yaml) builds non-root API and dashboard containers, mounts persistent SQLite storage, and checks `/readyz`.
+Create a Render Blueprint from this repository; [`render.yaml`](render.yaml) builds the non-root API container, mounts persistent SQLite storage, pins one instance, and checks `/readyz`. Import the repository into Vercel with **Root Directory = `frontend`**; [`frontend/vercel.json`](frontend/vercel.json) fixes the framework and clean-install/build commands.
+
+Set Vercel `BACKEND_URL` to the public Render API URL. Set Render `FRONTEND_URL` and `ALLOWED_ORIGINS` to the exact Vercel production origin. An optional project-scoped `ALLOWED_ORIGIN_REGEX` enables Vercel preview deployments without using a wildcard origin.
 
 Configure these secrets in Render, never in Git:
 
 - `OPENAI_API_KEY`
 - `GROQ_API_KEY`
-- `GITHUB_TOKEN`
-- `GITHUB_WEBHOOK_SECRET` when webhook ingestion is added
+- `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET` for live GitHub automation
+- `DODO_API_KEY`, `DODO_WEBHOOK_SECRET`, and the three Dodo product IDs for paid plans
 - `ALLOWED_ORIGINS` set to the deployed frontend origin
 
-The dashboard reads `BACKEND_URL` through a runtime route, so the same image can move between Compose, staging, and production without rebuilding. For multi-instance production, switch `DATABASE_URL` to `postgresql+asyncpg://…`.
+The dashboard reads `BACKEND_URL` through a runtime route, so Vercel never exposes backend credentials and the same build can move between environments. For multi-instance production, remove the one-instance constraint and switch `DATABASE_URL` to `postgresql+asyncpg://…`.
 
 ## How Codex was used
 

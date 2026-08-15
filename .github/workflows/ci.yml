@@ -20,7 +20,7 @@ jobs:
       - run: pip install -r backend/requirements-dev.txt
       - run: pytest --cov=app --cov-report=term-missing
         working-directory: backend
-      - run: ruff check app tests
+      - run: ruff check app billing tests
         working-directory: backend
       - run: docker build -f backend/Dockerfile -t forgeguard-api .
 
@@ -43,3 +43,4 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - run: docker build -f frontend/Dockerfile -t forgeguard-dashboard .

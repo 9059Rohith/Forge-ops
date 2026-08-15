@@ -12,9 +12,9 @@ services:
       MAX_REPAIR_CYCLES: ${MAX_REPAIR_CYCLES:-2}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ALLOWED_REPOS: ${ALLOWED_REPOS:-}
-      ALLOWED_ORIGINS: http://localhost:3000
-      FRONTEND_URL: http://localhost:3000
-      BACKEND_URL: http://localhost:8000
+      ALLOWED_ORIGINS: ${PUBLIC_FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:3000}
+      BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:8000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GITHUB_APP_ID: ${GITHUB_APP_ID:-}
@@ -27,7 +27,7 @@ services:
       DODO_PRODUCT_PRO: ${DODO_PRODUCT_PRO:-}
       DODO_PRODUCT_TEAM: ${DODO_PRODUCT_TEAM:-}
       SESSION_SECRET: ${SESSION_SECRET:-}
-    ports: ["8000:8000"]
+    ports: ["${BACKEND_PORT:-8000}:8000"]
     volumes:
       - forgeguard-data:/data
       - forgeguard-workspaces:/workspace
@@ -39,8 +39,8 @@ services:
       dockerfile: frontend/Dockerfile
     environment:
       # Returned to the browser at request time, not compiled into the image.
-      BACKEND_URL: http://localhost:8000
-    ports: ["3000:3000"]
+      BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:8000}
+    ports: ["${FRONTEND_PORT:-3000}:3000"]
     depends_on:
       backend:
         condition: service_healthy

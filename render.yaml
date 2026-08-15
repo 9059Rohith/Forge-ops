@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 services:
   - type: web
     name: forgeguard-api
@@ -6,6 +7,7 @@ services:
     dockerContext: .
     healthCheckPath: /readyz
     autoDeploy: true
+    numInstances: 1
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -13,6 +15,8 @@ services:
         value: sqlite+aiosqlite:////data/forgeguard.db
       - key: WORKSPACE_ROOT
         value: /workspace
+      - key: WORKSPACE_RETENTION_HOURS
+        value: "0"
       - key: DEMO_MODE
         value: "true"
       - key: MAX_REPAIR_CYCLES
@@ -41,20 +45,15 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: FRONTEND_URL
+        sync: false
       - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ALLOWED_ORIGIN_REGEX
+        sync: false
+      - key: ALLOWED_REPOS
         sync: false
     disk:
       name: forgeguard-data
       mountPath: /data
       sizeGB: 1
-
-  - type: web
-    name: forgeguard-dashboard
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: .
-    healthCheckPath: /
-    autoDeploy: true
-    envVars:
-      - key: BACKEND_URL
-        sync: false

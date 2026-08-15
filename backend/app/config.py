@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "sqlite+aiosqlite:///./forgeguard.db"
     allowed_origins: list[str] | str = Field(default_factory=lambda: ["http://localhost:3000"])
+    allowed_origin_regex: str | None = None
     demo_repo_path: Path = Path(__file__).resolve().parents[2] / "demo-repo"
     work_root: Path = Field(
         default=Path(__file__).resolve().parents[2] / ".forgeguard-work",

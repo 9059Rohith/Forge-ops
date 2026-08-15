@@ -1,6 +1,6 @@
 # ForgeGuard Deployment Guide
 
-This guide takes a fresh checkout to a demo or production-shaped Render deployment. Configuration precedence is **process environment → `.env` file → code defaults**.
+This guide takes a fresh checkout to a Vercel dashboard paired with a Render API. Configuration precedence is **process environment → `.env` file → code defaults**.
 
 ## Prerequisites
 
@@ -47,6 +47,25 @@ cd backend
 alembic upgrade head
 ```
 
+## Vercel dashboard + Render API
+
+1. In Render, create a Blueprint from this repository. `render.yaml` provisions only `forgeguard-api`, its `/data` disk, and the `/readyz` health check. The Blueprint pins one instance because SQLite is a single-instance deployment.
+2. Set the Render secrets requested by the Blueprint. For the deterministic first deploy, `DEMO_MODE=true` needs no model or payment credentials. Keep the generated API URL, such as `https://forgeguard-api.onrender.com`.
+3. Import the same repository into Vercel and set **Root Directory** to `frontend`. Vercel then reads `frontend/vercel.json` and detects Next.js.
+4. In every Vercel environment, set `BACKEND_URL` to the Render API URL without a trailing slash. Do not put provider or payment secrets in Vercel.
+5. Set Render `FRONTEND_URL` and `ALLOWED_ORIGINS` to the final Vercel production origin, for example `https://forge-ops.vercel.app`.
+6. For Vercel previews, optionally set Render `ALLOWED_ORIGIN_REGEX` to a project-scoped expression such as `^https://forge-ops(?:-[a-z0-9-]+)?\\.vercel\\.app$`. Keep `ALLOWED_ORIGINS` set to the exact production origin.
+
+Smoke-check the deployed pair:
+
+```bash
+curl https://YOUR_RENDER_API/healthz
+curl https://YOUR_RENDER_API/readyz
+curl https://YOUR_VERCEL_APP/api/config
+```
+
+The last response must contain the Render URL. Then submit the bundled `demo` task through Vercel and confirm it reaches `VERIFIED`.
+
 ## GitHub App setup
 
 1. In GitHub Developer Settings, create a GitHub App named for your deployment.
@@ -65,9 +84,9 @@ ForgeGuard creates and pushes only `forgeguard/repair-{job_id}` branches, then o
 4. Subscribe to subscription active/updated/renewed/cancelled events; ForgeGuard also accepts the legacy created/canceled and invoice-paid aliases.
 5. Set the API and webhook credentials as `DODO_API_KEY` and `DODO_WEBHOOK_SECRET`.
 
-## Render
+## Render details
 
-Create a Blueprint from [render.yaml](render.yaml). It provisions the API, persistent SQLite disk, and dashboard. Set `BACKEND_URL` on the dashboard to the API's public URL, and set `FRONTEND_URL` plus `ALLOWED_ORIGINS` on the API to the dashboard's public URL.
+Create a Blueprint from [render.yaml](render.yaml). It builds the non-root API container, runs `alembic upgrade head` before startup, prepares writable `/data` and `/workspace` paths, mounts persistent SQLite storage, and checks `/readyz`. The dashboard belongs on Vercel, not as a second Render service.
 
 For production provider-backed mode, set `DEMO_MODE=false`. Startup deliberately fails with a list of missing GitHub, model, Dodo, product, and session settings. Keep `DEMO_MODE=true` for a judge-facing deterministic deployment without paid model calls.
 
