@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from app.agents.demo import demo_engineer, demo_repair, demo_security_review
 from app.agents.repair import run_repair
@@ -55,3 +56,29 @@ async def test_provider_repair_normalizes_a_filename_to_content_map(tmp_path: Pa
     assert result["files"] == [
         {"path": "auth.py", "content": "def authorize():\n    return False\n"}
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"error": "unable to repair"},
+        {"message": "refused"},
+        {"plan": "I would update the authorization check."},
+        {"../outside.py": "malicious"},
+    ],
+)
+async def test_provider_repair_rejects_prose_errors_and_unsafe_legacy_maps(
+    tmp_path: Path, response: dict[str, str]
+):
+    async def completion(_: str, __: str) -> str:
+        return json.dumps(response)
+
+    with pytest.raises((ValidationError, ValueError)):
+        await run_repair(
+            JSONProvider(completion=completion, timeout_seconds=1),
+            tmp_path,
+            "Preserve authorization",
+            "diff",
+            "Authorization was weakened",
+        )

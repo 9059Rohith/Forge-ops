@@ -10,7 +10,7 @@
 
 [![Backend](https://img.shields.io/badge/backend-FastAPI-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
 [![Frontend](https://img.shields.io/badge/frontend-Next.js-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
-[![Tests](https://img.shields.io/badge/tests-53%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
+[![Tests](https://img.shields.io/badge/tests-57%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
 [![Demo](https://img.shields.io/badge/demo-no%20API%20keys%20required-64e6bd?style=flat-square&labelColor=0b141c)](#run-the-live-demo)
 [![Evidence](https://img.shields.io/badge/evidence-SHA--256%20sealed-64e6bd?style=flat-square&labelColor=0b141c)](#tamper-evident-verification-receipt)
 
@@ -285,7 +285,7 @@ Interactive documentation is available at `http://localhost:8000/api/docs`.
 | `GET` | `/api/tasks/{id}/flight-log` | Ordered execution trace |
 | `GET` | `/api/tasks/{id}/diff` | Captured staged Git diff |
 | `GET` | `/api/tasks/{id}/proof` | Markdown proof plus nullable sealed receipt |
-| `POST` | `/api/tasks/{id}/repair` | Idempotent manual retry for an eligible blocked task |
+| `POST` | `/api/tasks/{id}/repair` | Manual retry for an eligible blocked task |
 
 Example task request:
 
@@ -382,7 +382,7 @@ ForgeGuard is currently a controlled hackathon service, not a public multi-tenan
 
 | Layer | Coverage | Command |
 |---|---:|---|
-| Backend | 39 tests | `cd backend && python -m pytest` |
+| Backend | 43 tests | `cd backend && python -m pytest` |
 | Python quality | Ruff rules | `cd backend && python -m ruff check app tests` |
 | Frontend | 7 tests | `cd frontend && npm test -- --run` |
 | Frontend types | TypeScript | `cd frontend && npm run typecheck` |

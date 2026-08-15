@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalize(item)]),
+    );
+  }
+  return value;
+}
 
 test("submits the deterministic demo and reaches a proof-carrying verdict", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1584, height: 1024 });
@@ -23,8 +36,15 @@ test("submits the deterministic demo and reaches a proof-carrying verdict", asyn
   const download = await downloadPromise;
   const downloadPath = await download.path();
   expect(downloadPath).not.toBeNull();
-  const receipt = JSON.parse(await readFile(downloadPath!, "utf8")) as { receipt_id: string };
+  const receipt = JSON.parse(await readFile(downloadPath!, "utf8")) as Record<string, unknown> & {
+    receipt_id: string;
+    integrity: { algorithm: string; digest: string };
+  };
   expect(receipt.receipt_id).toBe(receiptId);
+  const { receipt_id: _, integrity: __, ...evidence } = receipt;
+  const digest = createHash("sha256").update(JSON.stringify(canonicalize(evidence))).digest("hex");
+  expect(receipt.integrity).toEqual({ algorithm: "sha256", digest });
+  expect(receipt.receipt_id).toBe(`fg_${digest.slice(0, 16)}`);
 
   await page.screenshot({ path: testInfo.outputPath("forgeguard-verified.png"), fullPage: true });
 });

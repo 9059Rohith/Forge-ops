@@ -29,7 +29,7 @@ from app.core.repository import apply_file_changes
 from app.core.risk_engine import compute_risk
 from app.core.worktree import Worktree, WorktreeManager
 from app.db import session_scope
-from app.models import AgentRun, Evaluation, Task, utcnow
+from app.models import AgentRun, Evaluation, FlightLog, Task, utcnow
 from app.providers.groq_client import create_groq_provider
 from app.providers.openai_client import create_openai_provider
 
@@ -51,6 +51,19 @@ async def _update_task(task_id: str, **values: Any) -> None:
         for key, value in values.items():
             setattr(task, key, value)
         task.updated_at = utcnow()
+        await session.commit()
+
+
+async def _finalize_task(task_id: str, event: str, **values: Any) -> None:
+    """Commit the terminal task state and its final evidence event atomically."""
+    async with session_scope() as session:
+        task = await session.get(Task, task_id)
+        if task is None:
+            raise LookupError(f"task {task_id} not found")
+        for key, value in values.items():
+            setattr(task, key, value)
+        task.updated_at = utcnow()
+        session.add(FlightLog(task_id=task_id, event=event.replace("\x00", "")[:2_000]))
         await session.commit()
 
 
@@ -250,8 +263,12 @@ async def run_task(task_id: str) -> None:
                     repair_cycles=task.repair_cycles,
                     decision="VERIFIED",
                 )
-                await _update_task(task_id, status="verified", proof_text=proof)
-                await record_event(task_id, "PR verified")
+                await _finalize_task(
+                    task_id,
+                    "PR verified",
+                    status="verified",
+                    proof_text=proof,
+                )
                 break
 
             await _update_task(task_id, status="blocked")
@@ -268,14 +285,12 @@ async def run_task(task_id: str) -> None:
                     repair_cycles=task.repair_cycles,
                     decision="BLOCKED",
                 )
-                await _update_task(
+                await _finalize_task(
                     task_id,
+                    "Max repair attempts reached — worktree preserved for inspection",
                     status="failed",
                     proof_text=proof,
                     error_message="Maximum repair attempts reached; worktree preserved for inspection.",
-                )
-                await record_event(
-                    task_id, "Max repair attempts reached — worktree preserved for inspection"
                 )
                 break
 

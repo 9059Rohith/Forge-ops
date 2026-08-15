@@ -13,7 +13,7 @@ async def test_demo_pipeline_blocks_repairs_and_verifies(
     from app.config import get_settings
 
     get_settings.cache_clear()
-    from app.core.orchestrator import run_task
+    from app.core import orchestrator
     from app.db import init_db, reset_engine_for_tests, session_scope
     from app.models import Project, Task
 
@@ -30,7 +30,15 @@ async def test_demo_pipeline_blocks_repairs_and_verifies(
         await session.commit()
         task_id = task.id
 
-    await run_task(task_id)
+    terminal_commits: list[str] = []
+    original_finalize_task = orchestrator._finalize_task
+
+    async def finalize_task_spy(observed_task_id: str, event: str, **values: object) -> None:
+        terminal_commits.append(f"{values.get('status')}:{event}")
+        await original_finalize_task(observed_task_id, event, **values)
+
+    monkeypatch.setattr(orchestrator, "_finalize_task", finalize_task_spy)
+    await orchestrator.run_task(task_id)
 
     async with session_scope() as session:
         task = await session.get(Task, task_id)
@@ -44,3 +52,4 @@ async def test_demo_pipeline_blocks_repairs_and_verifies(
         assert any("Patch blocked" in event for event in events)
         assert any("Repair cycle 1" in event for event in events)
         assert events[-1] == "PR verified"
+        assert terminal_commits == ["verified:PR verified"]
