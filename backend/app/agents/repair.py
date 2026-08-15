@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from app.agents.prompts import REPAIR_SYSTEM_PROMPT
 from app.core.repository import build_repository_context, resolve_safe_path
@@ -23,7 +23,11 @@ _KNOWN_EXTENSIONLESS_FILES = {"dockerfile", "license", "makefile", "procfile", "
 
 def _is_legacy_file_path(root: Path, candidate: str) -> bool:
     normalized = PurePosixPath(candidate.replace("\\", "/"))
-    if not candidate.strip() or candidate.casefold() in _NON_FILE_RESPONSE_KEYS:
+    if (
+        not candidate.strip()
+        or candidate.casefold() in _NON_FILE_RESPONSE_KEYS
+        or PureWindowsPath(candidate).is_absolute()
+    ):
         return False
     if not (
         normalized.suffix

@@ -66,6 +66,7 @@ async def test_provider_repair_normalizes_a_filename_to_content_map(tmp_path: Pa
         {"message": "refused"},
         {"plan": "I would update the authorization check."},
         {"../outside.py": "malicious"},
+        {r"C:\outside.py": "malicious"},
     ],
 )
 async def test_provider_repair_rejects_prose_errors_and_unsafe_legacy_maps(
