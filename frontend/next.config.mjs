@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  output: "standalone",
+  ...(process.env.VERCEL ? {} : { output: "standalone" }),
   allowedDevOrigins: ["127.0.0.1"],
   devIndicators: false,
   async headers() {

@@ -10,7 +10,7 @@
 
 [![Backend](https://img.shields.io/badge/backend-FastAPI-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
 [![Frontend](https://img.shields.io/badge/frontend-Next.js-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
-[![Tests](https://img.shields.io/badge/tests-91%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
+[![Tests](https://img.shields.io/badge/tests-93%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
 [![Demo](https://img.shields.io/badge/demo-no%20API%20keys%20required-64e6bd?style=flat-square&labelColor=0b141c)](#run-the-live-demo)
 [![Evidence](https://img.shields.io/badge/evidence-SHA--256%20sealed-64e6bd?style=flat-square&labelColor=0b141c)](#tamper-evident-verification-receipt)
 
@@ -435,7 +435,7 @@ ForgeGuard is currently a controlled hackathon service, not a public multi-tenan
 |---|---:|---|
 | Backend | 78 tests | `cd backend && python -m pytest` |
 | Python quality | Ruff rules | `cd backend && python -m ruff check app billing tests` |
-| Frontend | 10 tests | `cd frontend && npm test` |
+| Frontend | 12 tests | `cd frontend && npm test` |
 | Frontend types | TypeScript | `cd frontend && npm run typecheck` |
 | Production bundle | Next.js | `cd frontend && npm run build` |
 | Full browser flow | 4 desktop/mobile journeys | `cd frontend && npm run test:e2e` |
