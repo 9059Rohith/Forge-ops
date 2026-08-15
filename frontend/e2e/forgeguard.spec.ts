@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("submits the deterministic demo and reaches a proof-carrying verdict", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1584, height: 1024 });
@@ -14,6 +15,16 @@ test("submits the deterministic demo and reaches a proof-carrying verdict", asyn
   await expect(page.getByText(/Patch blocked by independent evidence/)).toBeVisible();
   await expect(page.getByText(/Repair cycle 1 completed/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Proof package" })).toBeVisible();
+  const visibleReceipt = page.getByText(/^fg_[0-9a-f]{16}$/);
+  await expect(visibleReceipt).toBeVisible();
+  const receiptId = await visibleReceipt.textContent();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: /download receipt/i }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const receipt = JSON.parse(await readFile(downloadPath!, "utf8")) as { receipt_id: string };
+  expect(receipt.receipt_id).toBe(receiptId);
 
   await page.screenshot({ path: testInfo.outputPath("forgeguard-verified.png"), fullPage: true });
 });

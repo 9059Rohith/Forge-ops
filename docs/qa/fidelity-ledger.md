@@ -34,3 +34,18 @@ One intentional data deviation remains: the repository field defaults to `demo` 
 ## Sign-off
 
 The final implementation preserves the accepted information hierarchy, container model, palette, typography roles, interaction model, responsive behavior, and required copy. No material visual mismatch remains that would block agency sign-off; the recorded deviations are functional data substitutions, not design reinterpretations.
+
+## Hackathon upgrade verification
+
+Upgrade QA date: 2026-08-15
+
+- **Capture method:** Playwright Chromium was used because no interactive Browser/IAB verification tool was available in this workspace. Desktop captures use the concepts' native 1584×1024 and 1516×1045 viewports; Pixel 7 runs cover the responsive continuation.
+- **Entry copy and composition:** unchanged from the accepted concept. The headline, form, workflow rail, and accountability line retain their original order, measure, and first-viewport balance.
+- **Dashboard hierarchy:** the status band, agent graph, reviewer rows, diff, evidence rail, proof surface, and footer remain in the accepted order and density.
+- **New evidence identity:** the required `Evidence sealed · fg_…` identity sits inside the existing proof header rather than creating another panel, preserving the container model and vertical rhythm.
+- **New download action:** `Download receipt` uses the existing mint outline-control family, Lucide stroke weight, 36px control height, monospaced label treatment, hover state, disabled state, and visible focus ring.
+- **Typography and palette:** all new receipt text uses the existing mono chrome scale; mint indicates verified integrity, muted slate carries supporting copy, and no new gradient, glow, radius, or shadow token was introduced.
+- **Responsive behavior:** proof actions wrap instead of overflowing, the receipt ID remains legible, and both Pixel 7 Playwright journeys complete the download flow without page-level horizontal overflow.
+- **Interaction evidence:** desktop and mobile runs both reached `VERIFIED`, displayed a 16-hex ForgeGuard receipt ID, downloaded JSON, and confirmed the downloaded ID matches the visible seal.
+
+The proof-header addition is an intentional functional extension requested by the hackathon upgrade. Direct `view_image` comparison of both accepted concepts and both fresh renders found no material mismatch requiring further visual repair. The implementation remains agency-signoff faithful to the accepted ForgeGuard design system.
