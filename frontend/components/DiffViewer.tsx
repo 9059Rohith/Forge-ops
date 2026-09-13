@@ -8,7 +8,7 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <div className="grid h-[220px] place-items-center font-mono text-xs text-muted">Loading diff renderer…</div>,
 });
 
-export function DiffViewer({ diff, fileCount }: { diff: string; fileCount: number }) {
+export function DiffViewer({ diff, fileCount, emptyState }: { diff: string; fileCount: number; emptyState?: string }) {
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-panel/75" aria-labelledby="diff-title">
       <div className="flex h-11 items-center justify-between border-b border-line px-4">
@@ -21,7 +21,7 @@ export function DiffViewer({ diff, fileCount }: { diff: string; fileCount: numbe
       <Editor
         height="220px"
         defaultLanguage="diff"
-        value={diff || "Waiting for the Engineer Agent to produce a patch…"}
+        value={diff || emptyState || "Waiting for the Engineer Agent to produce a patch…"}
         theme="vs-dark"
         options={{
           readOnly: true,

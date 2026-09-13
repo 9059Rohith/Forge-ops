@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Ignore the output video from Git but not videos you import into src/.
+out
+public/voice-test.mp3
+public/capture.json
+public/poster.png
+public/block-preview.png
+public/final-*.png

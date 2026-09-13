@@ -13,10 +13,11 @@ TERMINAL_STATUSES = {"verified", "failed", "manual_review_required"}
 
 
 class TaskCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     repo_url: str = Field(min_length=1, max_length=500)
     branch: str = Field(default="main", min_length=1, max_length=120)
     description: str = Field(min_length=3, max_length=10_000)
-    user_id: str | None = None
 
     @field_validator("repo_url", "branch", "description", mode="before")
     @classmethod
@@ -121,7 +122,7 @@ class DiffView(BaseModel):
 class VerificationReceipt(BaseModel):
     schema_version: str
     receipt_id: str
-    decision: Literal["VERIFIED", "BLOCKED"]
+    decision: Literal["VERIFIED", "BLOCKED", "AUDIT_COMPLETE"]
     task: dict[str, Any]
     verification: dict[str, Any]
     provenance: dict[str, Any]
@@ -144,6 +145,32 @@ class ReviewResult(BaseModel):
     severity: Literal["none", "low", "medium", "high", "critical"]
     finding: str = Field(min_length=1, max_length=4_000)
     evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class SecurityAuditFinding(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    category: Literal["secrets", "authentication", "authorization", "api", "dependencies", "other"]
+    severity: Literal["info", "low", "medium", "high", "critical"]
+    confidence: int = Field(ge=0, le=100)
+    location: str = Field(min_length=1, max_length=500)
+    evidence: str = Field(min_length=1, max_length=2_000)
+    recommendation: str = Field(min_length=1, max_length=2_000)
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def normalize_probability_confidence(cls, value: object) -> object:
+        if isinstance(value, int | float) and 0 < value <= 1:
+            return round(float(value) * 100)
+        return value
+
+
+class SecurityAuditResult(BaseModel):
+    summary: str = Field(min_length=1, max_length=4_000)
+    coverage: list[Literal["secrets", "authentication", "authorization", "api", "dependencies"]] = Field(
+        default_factory=list, max_length=5
+    )
+    limitations: list[str] = Field(default_factory=list, max_length=50)
+    findings: list[SecurityAuditFinding] = Field(default_factory=list, max_length=100)
 
 
 class FileChange(BaseModel):

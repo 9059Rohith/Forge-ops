@@ -1,27 +1,20 @@
 import type { BillingStatus, FlightLog, RepairAuthorization, TaskDetail, TaskInput, VerificationReceipt } from "@/lib/types";
 
-let runtimeApiUrl: string | null = null;
-
-async function apiUrl(): Promise<string> {
-  if (runtimeApiUrl) return runtimeApiUrl;
-  const fallback = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
-  if (typeof window === "undefined") return (process.env.BACKEND_URL || fallback).replace(/\/$/, "");
-  try {
-    const response = await fetch("/api/config", { cache: "no-store" });
-    const config = (await response.json()) as { backendUrl?: string };
-    runtimeApiUrl = (config.backendUrl || fallback).replace(/\/$/, "");
-  } catch {
-    runtimeApiUrl = fallback;
-  }
-  return runtimeApiUrl;
-}
+const API_BASE = "/api/backend";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${await apiUrl()}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+      cache: "no-store",
+    });
+  } catch (cause) {
+    throw new Error("ForgeGuard API is unavailable. Check the service connection and try again.", {
+      cause,
+    });
+  }
   if (!response.ok) {
     let detail = `Request failed (${response.status})`;
     try {
@@ -49,7 +42,7 @@ export const getProof = (id: string) =>
     `/api/tasks/${encodeURIComponent(id)}/proof`,
   );
 
-export const getBillingStatus = (userId = "demo") =>
+export const getBillingStatus = (userId: string) =>
   request<BillingStatus>(`/api/billing/status/${encodeURIComponent(userId)}`);
 export const createCheckout = (userId: string, plan: "developer" | "pro" | "team") =>
   request<{ checkout_url: string }>("/api/billing/checkout", {

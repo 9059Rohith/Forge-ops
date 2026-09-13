@@ -8,14 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-const DEFAULT_TASK =
-  "Add retry handling with exponential backoff to checkout. Do not change the public API.";
-
 export function TaskForm() {
   const router = useRouter();
-  const [repoUrl, setRepoUrl] = useState("demo");
+  const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
-  const [description, setDescription] = useState(DEFAULT_TASK);
+  const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,11 +46,12 @@ export function TaskForm() {
             id="repository"
             value={repoUrl}
             onChange={(event) => setRepoUrl(event.target.value)}
+            placeholder="C:/projects/my-repository or https://github.com/org/repository"
             autoComplete="url"
             spellCheck={false}
             aria-describedby="repository-hint"
           />
-          <span id="repository-hint" className="sr-only">Use demo, a local repository path, or an HTTPS Git URL.</span>
+          <span id="repository-hint" className="sr-only">Use a local repository path or an HTTPS GitHub URL.</span>
         </div>
         <div className="block font-mono text-sm tracking-wide text-muted">
           <label htmlFor="branch" className="mb-2 block">Branch</label>
@@ -61,7 +59,12 @@ export function TaskForm() {
         </div>
         <div className="block font-mono text-sm tracking-wide text-muted">
           <label htmlFor="engineering-task" className="mb-2 block">Engineering task</label>
-          <Textarea id="engineering-task" value={description} onChange={(event) => setDescription(event.target.value)} />
+          <Textarea
+            id="engineering-task"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Describe the engineering change and its constraints"
+          />
         </div>
         {error && (
           <p role="alert" className="rounded-md border border-danger/35 bg-danger/10 px-3 py-2 text-sm text-danger">

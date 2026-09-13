@@ -23,7 +23,10 @@ interface Props {
 }
 
 export function TaskDashboard({ task, logs, diff, proof, receipt }: Props) {
-  const mostSevere = [...task.evaluations].sort((a, b) => b.score - a.score)[0];
+  const severityRank = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+  const mostSevere = [...task.evaluations].sort(
+    (a, b) => severityRank[b.severity] - severityRank[a.severity] || a.score - b.score,
+  )[0];
   return (
     <main className="min-h-screen bg-canvas px-3 pb-5 text-ink sm:px-5">
       <header className="mx-auto flex h-[62px] max-w-[1580px] items-center justify-between">
@@ -62,9 +65,17 @@ export function TaskDashboard({ task, logs, diff, proof, receipt }: Props) {
             <section className="space-y-2" aria-label="Independent reviews">
               {task.evaluations.length === 0 ? (
                 <div className="rounded-lg border border-line bg-panel/55 px-4 py-6 font-mono text-xs text-muted">Independent reviewers will appear when the patch is ready.</div>
-              ) : task.evaluations.map((evaluation) => <ReviewerCard key={evaluation.id} evaluation={evaluation} />)}
+              ) : task.evaluations.map((evaluation) => <ReviewerCard key={evaluation.id} evaluation={evaluation} auditMode={task.status === "audit_complete" || task.pending_plan === "Read-only security audit"} />)}
             </section>
-            <DiffViewer diff={diff} fileCount={task.changed_files.length} />
+            <DiffViewer
+              diff={diff}
+              fileCount={task.changed_files.length}
+              emptyState={
+                task.status === "audit_complete"
+                  ? "No repository files were changed — this was a read-only security audit."
+                  : undefined
+              }
+            />
           </div>
           <aside className="space-y-3">
             <RiskPanel task={task} />

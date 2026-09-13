@@ -1,10 +1,11 @@
 import { ShieldCheck } from "lucide-react";
 import { Brand } from "@/components/Brand";
 import { TaskForm } from "@/components/TaskForm";
+import { TaskLookupForm } from "@/components/TaskLookupForm";
 import { WorkflowRail } from "@/components/WorkflowRail";
-import { RepairCreditsCard } from "@/components/RepairCreditsCard";
 
 export default function HomePage() {
+  const webhookOnly = process.env.TASK_SUBMISSION_MODE === "webhook";
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-line/80">
@@ -22,7 +23,9 @@ export default function HomePage() {
               Give an agent a task. ForgeGuard builds the patch, challenges it, repairs it, and returns evidence you can trust.
             </p>
           </div>
-          <div className="w-full space-y-3 lg:max-w-[647px]"><TaskForm /><RepairCreditsCard /></div>
+          <div className="w-full lg:max-w-[647px]">
+            {webhookOnly ? <TaskLookupForm /> : <TaskForm />}
+          </div>
         </section>
         <section className="mx-auto mt-14 max-w-[1372px] lg:mt-14">
           <WorkflowRail />

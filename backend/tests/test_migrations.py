@@ -13,5 +13,7 @@ def test_alembic_upgrade_creates_complete_schema(tmp_path: Path, monkeypatch: py
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     command.upgrade(config, "head")
 
-    tables = set(inspect(create_engine(f"sqlite:///{database}")).get_table_names())
+    inspector = inspect(create_engine(f"sqlite:///{database}"))
+    tables = set(inspector.get_table_names())
     assert {"tasks", "users", "subscriptions", "repair_credits", "repair_usages", "audit_logs"} <= tables
+    assert "github_user_id" in {column["name"] for column in inspector.get_columns("users")}

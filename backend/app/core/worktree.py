@@ -129,8 +129,11 @@ class WorktreeManager:
     def remove(self, worktree: Worktree) -> None:
         worktree.repo.close()
         try:
-            worktree.owner_repo.git.worktree("remove", "--force", str(worktree.path))
-        except GitCommandError:
-            if worktree.path.exists():
-                shutil.rmtree(worktree.path)
-            worktree.owner_repo.git.worktree("prune")
+            try:
+                worktree.owner_repo.git.worktree("remove", "--force", str(worktree.path))
+            except GitCommandError:
+                if worktree.path.exists():
+                    shutil.rmtree(worktree.path)
+                worktree.owner_repo.git.worktree("prune")
+        finally:
+            worktree.owner_repo.close()

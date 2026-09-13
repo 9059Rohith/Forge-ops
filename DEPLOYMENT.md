@@ -9,17 +9,18 @@ This guide takes a fresh checkout to a Vercel dashboard paired with a Render API
 - OpenAI and Groq API keys when `DEMO_MODE=false`
 - A Dodo Payments account with three subscription products
 
-## Two-minute local demo
+## Local real-provider run
 
 ```bash
 copy .env.example .env        # Windows
 # cp .env.example .env        # macOS/Linux
+# Edit .env and set OPENAI_API_KEY and GROQ_API_KEY.
 docker compose up --build
 ```
 
 Open `http://localhost:3000`. The Compose backend runs `alembic upgrade head` before Uvicorn, persists SQLite under `/data`, and removes completed workspaces unless `WORKSPACE_RETENTION_HOURS` is non-zero.
 
-For a local non-container seed, install backend dependencies and run:
+`DEMO_MODE=false` is the default. The deterministic seed script is for automated/demo testing only and is not part of a real-provider run:
 
 ```bash
 pip install -r backend/requirements.txt
@@ -50,9 +51,9 @@ alembic upgrade head
 ## Vercel dashboard + Render API
 
 1. In Render, create a Blueprint from this repository. `render.yaml` provisions only `forgeguard-api`, its `/data` disk, and the `/readyz` health check. The Blueprint pins one instance because SQLite is a single-instance deployment.
-2. Set the Render secrets requested by the Blueprint. For the deterministic first deploy, `DEMO_MODE=true` needs no model or payment credentials. Keep the generated API URL, such as `https://forgeguard-api.onrender.com`.
+2. Set the Render secrets requested by the Blueprint and keep `DEMO_MODE=false`. Keep the generated API URL, such as `https://forgeguard-api.onrender.com`.
 3. Import the same repository into Vercel and set **Root Directory** to `frontend`. Vercel then reads `frontend/vercel.json` and detects Next.js.
-4. In every Vercel environment, set `BACKEND_URL` to the Render API URL without a trailing slash. Do not put provider or payment secrets in Vercel.
+4. In every Vercel environment, set `BACKEND_URL` to the Render API URL without a trailing slash and set `TASK_SUBMISSION_MODE=webhook`. The landing page then shows task-ID lookup instead of a form that production intentionally rejects. Do not put provider or payment secrets in Vercel.
 5. Set Render `FRONTEND_URL` and `ALLOWED_ORIGINS` to the final Vercel production origin, for example `https://forge-ops.vercel.app`.
 6. For Vercel previews, optionally set Render `ALLOWED_ORIGIN_REGEX` to a project-scoped expression such as `^https://forge-ops(?:-[a-z0-9-]+)?\\.vercel\\.app$`. Keep `ALLOWED_ORIGINS` set to the exact production origin.
 
@@ -61,10 +62,12 @@ Smoke-check the deployed pair:
 ```bash
 curl https://YOUR_RENDER_API/healthz
 curl https://YOUR_RENDER_API/readyz
-curl https://YOUR_VERCEL_APP/api/config
+curl https://YOUR_VERCEL_APP/api/backend/healthz
 ```
 
-The last response must contain the Render URL. Then submit the bundled `demo` task through Vercel and confirm it reaches `VERIFIED`.
+The last response must report a healthy API through the same-origin Vercel proxy. Then push a commit to an installed, allowlisted repository; the signed GitHub webhook creates the job with installation metadata and the real sender identity. Confirm it reaches a terminal evidence-backed verdict.
+
+To get the task ID, open the GitHub App's **Advanced** settings, select the push under **Recent deliveries**, open its response, and copy `task_id` from the JSON body. Paste that UUID into the production landing page. GitHub's normal push page does not display webhook response bodies.
 
 ## GitHub App setup
 
@@ -75,6 +78,8 @@ The last response must contain the Render URL. Then submit the bundled `demo` ta
 5. Provision `GITHUB_APP_ID` and the PEM value as `GITHUB_PRIVATE_KEY`. Push webhooks carry the installation ID; ForgeGuard exchanges it for a short-lived token restricted to contents, pull requests, and metadata. `GITHUB_TOKEN` is an optional local-development fallback only.
 
 ForgeGuard creates and pushes only `forgeguard/repair-{job_id}` branches, then opens an evidence-backed PR against the original base branch. A runtime assertion rejects `main`, `master`, and `production` as write targets, and the app never merges the PR.
+
+For databases upgraded from a version that predates immutable GitHub IDs, legacy `users` rows remain deliberately unlinked. Before accepting webhooks for one of those accounts, verify the person's numeric GitHub user ID independently, back up the database, and set `users.github_user_id` for the exact internal user UUID. Never infer this link from the current username: GitHub usernames can be renamed and reassigned. Until the verified backfill is complete, ForgeGuard returns `409` and does not create or bill the task.
 
 ## Dodo Payments setup
 
@@ -88,7 +93,7 @@ ForgeGuard creates and pushes only `forgeguard/repair-{job_id}` branches, then o
 
 Create a Blueprint from [render.yaml](render.yaml). It builds the non-root API container, runs `alembic upgrade head` before startup, prepares writable `/data` and `/workspace` paths, mounts persistent SQLite storage, and checks `/readyz`. The dashboard belongs on Vercel, not as a second Render service.
 
-For production provider-backed mode, set `DEMO_MODE=false`. Startup deliberately fails with a list of missing GitHub, model, Dodo, product, and session settings. Keep `DEMO_MODE=true` for a judge-facing deterministic deployment without paid model calls.
+Production uses `DEMO_MODE=false`. Startup deliberately fails with a list of missing GitHub, model, Dodo, product, and session settings. Enable `DEMO_MODE=true` only for an explicitly non-production deterministic test deployment.
 
 ## CI/CD and release
 
@@ -99,8 +104,8 @@ For production provider-backed mode, set `DEMO_MODE=false`. Startup deliberately
 
 ## Scripted judge walkthrough
 
-1. Open the dashboard and point out the Pro Repair Credits balance.
-2. Submit the bundled checkout retry task against `demo` / `main`.
+1. Open the dashboard and confirm the API health through `/api/backend/healthz`.
+2. Push the actual engineering change to an installed, allowlisted repository and follow the signed-webhook job.
 3. Show deterministic tests passing while independent reviewers block the authorization regression.
 4. Show the single credit authorization, bounded Repair cycle, and full re-verification.
 5. Download the sealed receipt and open `/api/jobs/{job_id}/evidence` to show findings, plan, diff, tests, verdict, audit events, and credit usage together.

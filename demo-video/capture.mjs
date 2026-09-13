@@ -1,0 +1,37 @@
+// Capture the real app; no API response mocking or synthetic dashboard data.
+import { chromium } from '../frontend/node_modules/@playwright/test/index.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
+const output = fileURLToPath(new URL('./public/', import.meta.url));
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext({ viewport: { width: 1500, height: 900 }, deviceScaleFactor: 1.5 });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+await page.goto(process.env.DEMO_URL || 'http://127.0.0.1:3000');
+await page.getByLabel('Repository').fill('demo');
+await page.getByLabel('Engineering task').fill('Add retry handling with exponential backoff to checkout. Do not change the public API.');
+await page.screenshot({ path: `${output}/entry.png` });
+await page.getByRole('button', { name: /start autonomous engineering/i }).click();
+await page.waitForURL(/\/task\//);
+await page.getByText('VERIFIED', { exact: true }).first().waitFor({ timeout: 90000 });
+await page.getByRole('button', { name: /download receipt/i }).waitFor();
+await page.screenshot({ path: `${output}/verified.png` });
+await page.getByLabel('Live agent verification graph').screenshot({ path: `${output}/graph.png` });
+const flight = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Flight recorder' }) });
+await flight.locator('ol').evaluate(element => { element.style.overflow = 'visible'; });
+await flight.evaluate(element => { element.style.height = 'auto'; });
+await flight.screenshot({ path: `${output}/flight.png` });
+const proof = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Proof package' }) });
+await proof.locator('.prose').evaluate(element => { element.style.maxHeight = '650px'; });
+await proof.screenshot({ path: `${output}/proof.png` });
+const downloadPromise = page.waitForEvent('download');
+await page.getByRole('button', { name: /download receipt/i }).click();
+const download = await downloadPromise;
+await download.saveAs(`${output}/demo-receipt.json`);
+await writeFile(`${output}/capture.json`, JSON.stringify({ url: page.url(), capturedAt: new Date().toISOString(), errors }, null, 2));
+await browser.close();
+if (errors.length) throw new Error(errors.join('\n'));
+console.log('Captured actual demo, graph, flight recorder, proof, and downloaded receipt.');

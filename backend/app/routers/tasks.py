@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -14,7 +15,6 @@ from app.core.proof_package import build_verification_receipt
 from app.db import get_db
 from app.models import Project, Task
 from app.schemas import ProofView, TaskCreate, TaskCreated
-from billing.models import User
 from billing.service import ensure_demo_user
 
 router = APIRouter(tags=["tasks"])
@@ -98,24 +98,55 @@ def _serialize_task(task: Task) -> dict[str, Any]:
 
 @router.post("", response_model=TaskCreated, status_code=status.HTTP_202_ACCEPTED)
 async def create_task(payload: TaskCreate, session: AsyncSession = Depends(get_db)):
-    if payload.user_id:
-        user = await session.get(User, payload.user_id)
-        if user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-    else:
+    settings = get_settings()
+    if settings.environment.lower() == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Production tasks must be created by a signed GitHub webhook.",
+        )
+    if payload.repo_url == "demo" and not settings.demo_mode:
+        raise HTTPException(
+            status_code=422,
+            detail="The bundled demo repository is disabled. Set DEMO_MODE=true explicitly or provide a real repository.",
+        )
+
+    repo_full_name: str | None = None
+    if payload.repo_url.startswith("https://github.com/"):
+        path = urlsplit(payload.repo_url).path.strip("/")
+        if path.endswith(".git"):
+            path = path[:-4]
+        if path.count("/") != 1:
+            raise HTTPException(status_code=422, detail="Invalid GitHub repository path")
+        repo_full_name = path
+        if settings.allowed_repos and repo_full_name not in settings.allowed_repos:
+            raise HTTPException(status_code=403, detail="Repository is not allowlisted")
+
+    if settings.demo_mode and payload.repo_url == "demo":
         user = await ensure_demo_user(session)
+    else:
+        user = None
     result = await session.execute(
         select(Project).where(
             Project.repo_url == payload.repo_url,
             Project.branch == payload.branch,
-        )
+        ).order_by(Project.created_at, Project.id).limit(1)
     )
     project = result.scalar_one_or_none()
     if project is None:
-        project = Project(repo_url=payload.repo_url, branch=payload.branch)
+        project = Project(
+            repo_url=payload.repo_url,
+            repo_full_name=repo_full_name,
+            branch=payload.branch,
+        )
         session.add(project)
         await session.flush()
-    task = Task(project_id=project.id, user_id=user.id, description=payload.description)
+    elif repo_full_name and not project.repo_full_name:
+        project.repo_full_name = repo_full_name
+    task = Task(
+        project_id=project.id,
+        user_id=user.id if user else None,
+        description=payload.description,
+    )
     session.add(task)
     await session.commit()
     schedule_task(task.id)
@@ -169,7 +200,13 @@ async def get_proof(task_id: str, session: AsyncSession = Depends(get_db)):
         confidence=task.confidence_score,
         risk_level=task.risk_level,
         repair_cycles=task.repair_cycles,
-        decision="VERIFIED" if task.status == "verified" else "BLOCKED",
+        decision=(
+            "VERIFIED"
+            if task.status == "verified"
+            else "AUDIT_COMPLETE"
+            if task.status == "audit_complete"
+            else "BLOCKED"
+        ),
         agent_runs=[
             {
                 "agent_name": item.agent_name,

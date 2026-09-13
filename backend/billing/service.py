@@ -12,6 +12,10 @@ from app.models import new_id, utcnow
 from billing.models import PLAN_CREDITS, RepairCredit, Subscription, User
 
 
+class BillingIdentityConflict(RuntimeError):
+    """Raised when a GitHub identity cannot be linked without operator verification."""
+
+
 def _datetime(value: Any, fallback: datetime) -> datetime:
     if isinstance(value, str):
         try:
@@ -21,32 +25,76 @@ def _datetime(value: Any, fallback: datetime) -> datetime:
     return fallback
 
 
-async def ensure_demo_user(session: AsyncSession) -> User:
-    user = await session.scalar(select(User).where(User.github_username == "forgeguard-demo"))
+async def ensure_user_with_free_credits(
+    session: AsyncSession,
+    github_username: str,
+    github_user_id: int | None = None,
+) -> User:
+    username = github_username.strip()
+    if not username or len(username) > 100:
+        raise ValueError("A valid GitHub username is required")
+    user = await session.scalar(
+        select(User).where(
+            User.github_user_id == github_user_id
+            if github_user_id is not None
+            else User.github_username == username
+        )
+    )
+    if github_user_id is not None and user is None:
+        username_owner = await session.scalar(
+            select(User).where(User.github_username == username)
+        )
+        if username_owner is not None:
+            raise BillingIdentityConflict(
+                "This GitHub username belongs to a legacy billing account and requires "
+                "a verified identity backfill before webhook processing can continue."
+            )
     if user is None:
         values = {
             "id": new_id(),
-            "github_username": "forgeguard-demo",
+            "github_user_id": github_user_id,
+            "github_username": username,
             "dodo_customer_id": None,
             "created_at": utcnow(),
         }
         dialect = session.bind.dialect.name if session.bind else "sqlite"
         statement = (
-            postgres_insert(User).values(**values).on_conflict_do_nothing(
-                index_elements=["github_username"]
-            )
+            postgres_insert(User).values(**values).on_conflict_do_nothing()
             if dialect == "postgresql"
-            else sqlite_insert(User).values(**values).on_conflict_do_nothing(
-                index_elements=["github_username"]
-            )
+            else sqlite_insert(User).values(**values).on_conflict_do_nothing()
         )
         await session.execute(statement)
         await session.commit()
         user = await session.scalar(
-            select(User).where(User.github_username == "forgeguard-demo")
+            select(User).where(
+                User.github_user_id == github_user_id
+                if github_user_id is not None
+                else User.github_username == username
+            )
         )
         if user is None:
-            raise RuntimeError("Unable to create demo billing user")
+            if github_user_id is not None:
+                username_owner = await session.scalar(
+                    select(User).where(User.github_username == username)
+                )
+                if username_owner is not None:
+                    raise BillingIdentityConflict(
+                        "This GitHub username belongs to a legacy billing account and requires "
+                        "a verified identity backfill before webhook processing can continue."
+                    )
+            raise RuntimeError("Unable to create billing user")
+    if github_user_id is not None:
+        if user.github_user_id != github_user_id:
+            raise BillingIdentityConflict(
+                "GitHub username is already linked to another identity"
+            )
+        if user.github_username != username:
+            conflict = await session.scalar(select(User).where(User.github_username == username))
+            if conflict is not None and conflict.id != user.id:
+                raise BillingIdentityConflict(
+                    "GitHub username is already linked to another identity"
+                )
+            user.github_username = username
 
     now = datetime.now(UTC)
     period_start = datetime(now.year, now.month, 1, tzinfo=UTC)
@@ -85,6 +133,10 @@ async def ensure_demo_user(session: AsyncSession) -> User:
         await session.execute(statement)
     await session.commit()
     return user
+
+
+async def ensure_demo_user(session: AsyncSession) -> User:
+    return await ensure_user_with_free_credits(session, "forgeguard-demo")
 
 
 async def process_subscription_event(session: AsyncSession, event: dict[str, Any]) -> None:

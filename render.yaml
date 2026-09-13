@@ -18,7 +18,7 @@ services:
       - key: WORKSPACE_RETENTION_HOURS
         value: "0"
       - key: DEMO_MODE
-        value: "true"
+        value: "false"
       - key: MAX_REPAIR_CYCLES
         value: "2"
       - key: OPENAI_API_KEY

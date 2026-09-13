@@ -6,6 +6,7 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -43,6 +44,23 @@ async def test_fresh_demo_has_free_repair_credits(billing_client: AsyncClient):
     assert response.status_code == 200
     assert response.json()["plan"] == "free"
     assert response.json()["credits_remaining"] == 3
+
+
+@pytest.mark.asyncio
+async def test_live_mode_never_bootstraps_demo_billing_user(
+    billing_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from billing import router
+
+    monkeypatch.setattr(router, "get_settings", lambda: SimpleNamespace(demo_mode=False))
+    response = await billing_client.get("/api/billing/status/demo")
+
+    assert response.status_code == 404
+    from app.db import session_scope
+    from billing.models import User
+
+    async with session_scope() as session:
+        assert (await session.scalars(select(User))).all() == []
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,7 @@
 # Repair Credits and Deployment Implementation Plan
 
+> Completion review (2026-09-13): implementation and current acceptance results are recorded in [the completion report](../../qa/completion-2026-09-13.md). Historical test-first steps below are retained as planning history, not a current pending-work queue.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add Dodo-backed Repair Credits to the existing ForgeGuard task lifecycle and make the full stack reproducibly deployable without replacing the current verification workflow.

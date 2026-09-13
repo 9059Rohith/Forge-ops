@@ -25,11 +25,25 @@ def test_blocks_when_no_tests_ran_even_if_reviewers_are_positive():
     assert result["risk_level"] == "MEDIUM"
 
 
+def test_missing_tests_are_a_hard_block_even_when_review_scores_cross_threshold():
+    result = compute_risk(review(100), review(100), review(85), 0, 0)
+
+    assert result["decision"] == "BLOCKED"
+    assert result["risk_level"] == "MEDIUM"
+
+
 def test_critical_finding_is_a_hard_failure():
     result = compute_risk(review(100, "critical"), review(100), review(100), 8, 8)
 
     assert result["decision"] == "BLOCKED"
     assert result["risk_level"] == "HIGH"
+
+
+@pytest.mark.parametrize("exit_code", [1, 2, 124])
+def test_runner_failure_blocks_even_when_reported_tests_pass(exit_code: int):
+    result = compute_risk(review(100), review(100), review(100), 8, 8, test_exit_code=exit_code)
+    assert result["decision"] == "BLOCKED"
+    assert result["overall_confidence"] == 80.0
 
 
 @pytest.mark.parametrize("severity", ["critical", "CRITICAL", "Critical"])

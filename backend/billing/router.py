@@ -34,6 +34,8 @@ async def checkout(payload: CheckoutRequest, session: AsyncSession = Depends(get
     plan = payload.plan.lower()
     if plan not in PLAN_CREDITS or plan == "free":
         raise HTTPException(status_code=422, detail="Choose developer, pro, or team")
+    if payload.user_id == "demo" and not settings.demo_mode:
+        raise HTTPException(status_code=404, detail="User not found")
     user = (
         await session.scalar(select(User).where(User.github_username == "forgeguard-demo"))
         if payload.user_id == "demo"
@@ -59,6 +61,8 @@ async def checkout(payload: CheckoutRequest, session: AsyncSession = Depends(get
 
 @router.get("/status/{user_id}")
 async def billing_status(user_id: str, session: AsyncSession = Depends(get_db)):
+    if user_id == "demo" and not get_settings().demo_mode:
+        raise HTTPException(status_code=404, detail="User not found")
     user = (
         await ensure_demo_user(session)
         if user_id == "demo"

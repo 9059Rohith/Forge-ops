@@ -4,6 +4,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 
+def test_live_mode_is_the_default(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+    from app.config import Settings
+
+    assert Settings(_env_file=None).demo_mode is False
+
+
 def test_vercel_preview_origin_regex_is_configurable(monkeypatch: pytest.MonkeyPatch):
     pattern = r"^https://forge-ops(?:-[a-z0-9-]+)?\.vercel\.app$"
     monkeypatch.setenv("ALLOWED_ORIGIN_REGEX", pattern)

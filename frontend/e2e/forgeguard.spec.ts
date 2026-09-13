@@ -15,12 +15,19 @@ function canonicalize(value: unknown): unknown {
 }
 
 test("submits the deterministic demo and reaches a proof-carrying verdict", async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1584, height: 1024 });
+  if (testInfo.project.name !== "mobile-chromium") {
+    await page.setViewportSize({ width: 1584, height: 1024 });
+  }
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Autonomous engineering, with proof." })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("forgeguard-entry.png"), fullPage: true });
-  await expect(page.getByLabel("Engineering task")).toBeFocused({ timeout: 1000 }).catch(() => undefined);
-  await page.setViewportSize({ width: 1516, height: 1045 });
+  await page.getByLabel("Repository").fill("demo");
+  await page.getByLabel("Engineering task").fill(
+    "Add retry handling with exponential backoff to checkout. Do not change the public API.",
+  );
+  if (testInfo.project.name !== "mobile-chromium") {
+    await page.setViewportSize({ width: 1516, height: 1045 });
+  }
   await page.getByRole("button", { name: /start autonomous engineering/i }).click();
 
   await expect(page).toHaveURL(/\/task\//);
@@ -45,6 +52,23 @@ test("submits the deterministic demo and reaches a proof-carrying verdict", asyn
   const digest = createHash("sha256").update(JSON.stringify(canonicalize(evidence))).digest("hex");
   expect(receipt.integrity).toEqual({ algorithm: "sha256", digest });
   expect(receipt.receipt_id).toBe(`fg_${digest.slice(0, 16)}`);
+
+  if (testInfo.project.name === "mobile-chromium") {
+    const graph = page.getByLabel("Live agent verification graph");
+    const graphBox = await graph.boundingBox();
+    const engineerBox = await graph.getByText("Engineer", { exact: true }).boundingBox();
+    const adversarialBox = await graph.getByText("Adversarial", { exact: true }).boundingBox();
+    expect(graphBox).not.toBeNull();
+    expect(engineerBox).not.toBeNull();
+    expect(adversarialBox).not.toBeNull();
+    expect(engineerBox!.x).toBeGreaterThanOrEqual(graphBox!.x);
+    expect(engineerBox!.x + engineerBox!.width).toBeLessThanOrEqual(
+      graphBox!.x + graphBox!.width,
+    );
+    expect(adversarialBox!.x + adversarialBox!.width).toBeLessThanOrEqual(
+      graphBox!.x + graphBox!.width,
+    );
+  }
 
   await page.screenshot({ path: testInfo.outputPath("forgeguard-verified.png"), fullPage: true });
 });

@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 vi.mock("next/dynamic", () => ({ default: () => () => <div data-testid="diff-editor" /> }));
 vi.mock("@/components/AgentGraph", () => ({ AgentGraph: () => <div data-testid="agent-graph" /> }));
+vi.mock("@/lib/api", () => ({ getAuthorization: vi.fn().mockResolvedValue({ credits_remaining: 1 }) }));
 
 import { TaskDashboard } from "@/components/TaskDashboard";
 import type { TaskDetail, VerificationReceipt } from "@/lib/types";
@@ -33,6 +34,18 @@ const task: TaskDetail = {
 };
 
 describe("TaskDashboard", () => {
+  it("shows the highest-severity finding when requesting repair authorization", async () => {
+    render(<TaskDashboard task={{ ...task, status: "awaiting_authorization", evaluations: [
+      { ...task.evaluations[0], score: 99, severity: "none", finding: "No security issue." },
+      { ...task.evaluations[1], score: 20, severity: "high", finding: "Scope needs repair." },
+      { ...task.evaluations[2], score: 50, severity: "critical", finding: "Critical authorization bypass." },
+    ] }} logs={[]} diff="diff" proof="proof" receipt={null} loading={false} />);
+
+    const authorization = within(screen.getByRole("region", { name: "Repair authorization required" }));
+    expect(authorization.getByRole("heading", { name: "Critical authorization bypass." })).toBeInTheDocument();
+    expect(await authorization.findByText("Available: 1")).toBeInTheDocument();
+  });
+
   it("renders verification evidence and expands reviewer details", async () => {
     render(<TaskDashboard task={task} logs={[]} diff="diff" proof="proof body" receipt={null} loading={false} />);
 
@@ -49,6 +62,46 @@ describe("TaskDashboard", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /copy proof/i }));
     expect(writeText).toHaveBeenCalledWith("proof body");
+  });
+
+  it("renders a completed security audit as read-only evidence, not a repair", () => {
+    const auditTask: TaskDetail = {
+      ...task,
+      description: "Audit security vulnerabilities and recommend fixes",
+      status: "audit_complete",
+      risk_level: "HIGH",
+      confidence_score: 93.7,
+      repair_cycles: 0,
+      tests_passed: 0,
+      tests_total: 0,
+      changed_files: [],
+      evaluations: [
+        {
+          id: "security-audit",
+          category: "security",
+          score: 96,
+          severity: "high",
+          finding: "One verified high-severity secret exposure.",
+          evidence: { findings: [{ title: "Hardcoded credential" }] },
+        },
+      ],
+    };
+
+    render(
+      <TaskDashboard
+        task={auditTask}
+        logs={[]}
+        diff=""
+        proof="## ForgeGuard Security Audit Complete"
+        receipt={null}
+        loading={false}
+      />,
+    );
+
+    expect(screen.getByText("AUDIT COMPLETE")).toBeInTheDocument();
+    expect(screen.getAllByText("Read-only audit").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /authorize repair/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/security audit complete/i)).toBeInTheDocument();
   });
 
   it("downloads the sealed verification receipt with its visible identity", async () => {

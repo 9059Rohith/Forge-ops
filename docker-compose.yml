@@ -5,7 +5,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      DEMO_MODE: ${DEMO_MODE:-true}
+      DEMO_MODE: ${DEMO_MODE:-false}
       DATABASE_URL: sqlite+aiosqlite:////data/forgeguard.db
       WORKSPACE_ROOT: /workspace
       WORKSPACE_RETENTION_HOURS: ${WORKSPACE_RETENTION_HOURS:-0}
@@ -38,8 +38,8 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     environment:
-      # Returned to the browser at request time, not compiled into the image.
-      BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:8000}
+      # Used only by the server-side same-origin API proxy.
+      BACKEND_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
     ports: ["${FRONTEND_PORT:-3000}:3000"]
     depends_on:
       backend:

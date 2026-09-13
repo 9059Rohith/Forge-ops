@@ -21,6 +21,16 @@ it("does not keep polling after a terminal status", async () => {
   expect(getTask).toHaveBeenCalledTimes(1);
 });
 
+it("stops polling when a read-only security audit completes", async () => {
+  vi.mocked(getTask).mockClear();
+  vi.mocked(getTask).mockResolvedValue({ status: "audit_complete" } as never);
+  const { result } = renderHook(() => useTaskPolling("audit-1", 10));
+
+  await waitFor(() => expect(result.current.task?.status).toBe("audit_complete"));
+  await new Promise((resolve) => setTimeout(resolve, 35));
+  expect(getTask).toHaveBeenCalledTimes(1);
+});
+
 it("exposes the sealed receipt returned with terminal proof", async () => {
   vi.mocked(getTask).mockResolvedValue({ status: "verified" } as never);
   vi.mocked(getProof).mockResolvedValue({

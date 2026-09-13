@@ -7,6 +7,7 @@ export type TaskStatus =
   | "awaiting_authorization"
   | "manual_review_required"
   | "repairing"
+  | "audit_complete"
   | "verified"
   | "failed";
 
@@ -45,7 +46,7 @@ export interface FlightLog {
 export interface VerificationReceipt {
   schema_version: "1.0";
   receipt_id: string;
-  decision: "VERIFIED" | "BLOCKED";
+  decision: "VERIFIED" | "BLOCKED" | "AUDIT_COMPLETE";
   task: {
     id: string;
     description: string;

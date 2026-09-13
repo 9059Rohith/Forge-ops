@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:12,250
+AI coding agents can deliver a patch that passes every test, while quietly weakening security. Meet ForgeGuard: autonomous engineering, with proof.
+
+2
+00:00:12,250 --> 00:00:26,250
+Start with a repository, a branch, and a clear engineering task. In this explicitly enabled showcase, we add exponential backoff to checkout, while preserving the public API.
+
+3
+00:00:26,250 --> 00:00:40,917
+The engineer works in an isolated Git worktree. ForgeGuard captures the actual diff, runs deterministic checks, and sends the patch to independent security, scope, and adversarial reviewers.
+
+4
+00:00:40,917 --> 00:00:56,167
+Here is the critical moment. The checkout tests pass, but the first patch also removes an authorization check. Independent evidence catches the unrelated regression, and ForgeGuard blocks the patch.
+
+5
+00:00:56,167 --> 00:01:11,208
+The repair agent restores the authorization boundary while keeping the retry implementation. ForgeGuard then runs the entire verification loop again. The repaired patch reaches a verified verdict.
+
+6
+00:01:11,208 --> 00:01:25,958
+Inspect the diff and the timestamped flight recorder. Then download the verification receipt: a portable record of the evidence, with SHA 256 hashes that let you check its integrity independently.
+
+7
+00:01:25,958 --> 00:01:41,417
+Beyond this showcase, ForgeGuard supports real repositories, provider-backed engineering, read-only security audits, and credit-authorized repair jobs. Production automation begins with a signed GitHub webhook.
+
+8
+00:01:41,417 --> 00:01:55,625
+Codex can write the code. ForgeGuard makes autonomous coding accountable. Build fast. Challenge independently. Ship with proof.

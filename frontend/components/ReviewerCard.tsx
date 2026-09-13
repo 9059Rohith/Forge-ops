@@ -7,8 +7,14 @@ const metadata = {
   adversarial: { label: "Adversarial Review", icon: Swords },
 };
 
-export function ReviewerCard({ evaluation, defaultOpen = false }: { evaluation: Evaluation; defaultOpen?: boolean }) {
-  const { label, icon: Icon } = metadata[evaluation.category];
+const auditMetadata = {
+  security: { label: "Security Findings", icon: ShieldCheck },
+  scope: { label: "Coverage Review", icon: Crosshair },
+  adversarial: { label: "Finding Verification", icon: Swords },
+};
+
+export function ReviewerCard({ evaluation, defaultOpen = false, auditMode = false }: { evaluation: Evaluation; defaultOpen?: boolean; auditMode?: boolean }) {
+  const { label, icon: Icon } = (auditMode ? auditMetadata : metadata)[evaluation.category];
   const good = evaluation.severity === "none" || evaluation.severity === "low";
   return (
     <details className="group rounded-lg border border-line bg-panel/70 open:border-mint/35" open={defaultOpen}>
@@ -20,7 +26,7 @@ export function ReviewerCard({ evaluation, defaultOpen = false }: { evaluation: 
           {label}
         </span>
         <span className="line-clamp-2 text-sm leading-6 text-muted">{evaluation.finding}</span>
-        <span className={`font-mono text-xs uppercase ${good ? "text-mint" : "text-danger"}`}>{good ? "Approved" : evaluation.severity}</span>
+        <span className={`font-mono text-xs uppercase ${good ? "text-mint" : "text-danger"}`}>{auditMode ? evaluation.severity : good ? "Approved" : evaluation.severity}</span>
         <strong className={good ? "font-mono text-sm text-mint" : "font-mono text-sm text-danger"}>{evaluation.score.toFixed(1)}%</strong>
         <span className="text-muted transition group-open:rotate-180">⌄</span>
       </summary>

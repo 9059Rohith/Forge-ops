@@ -14,7 +14,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models import Project, Task
 from app.routers.tasks import schedule_task
-from billing.service import ensure_demo_user
+from billing.service import BillingIdentityConflict, ensure_user_with_free_credits
 
 router = APIRouter(tags=["webhooks"])
 _requests: dict[str, deque[float]] = defaultdict(deque)
@@ -78,6 +78,11 @@ async def github_webhook(request: Request, session: AsyncSession = Depends(get_d
     branch = ref.removeprefix("refs/heads/")
     commit = payload.get("head_commit") if isinstance(payload.get("head_commit"), dict) else {}
     description = str(commit.get("message") or "Review and repair the pushed commit")[:10_000]
+    sender = payload.get("sender")
+    github_username = str(sender.get("login", "")).strip() if isinstance(sender, dict) else ""
+    github_user_id = sender.get("id") if isinstance(sender, dict) else None
+    if not github_username or not isinstance(github_user_id, int) or github_user_id <= 0:
+        raise HTTPException(status_code=422, detail="Missing GitHub sender identity")
 
     project = await session.scalar(
         select(Project).where(Project.repo_url == repo_url, Project.branch == branch)
@@ -95,7 +100,10 @@ async def github_webhook(request: Request, session: AsyncSession = Depends(get_d
         project.repo_full_name = full_name
         if installation_id is not None:
             project.github_installation_id = installation_id
-    user = await ensure_demo_user(session)
+    try:
+        user = await ensure_user_with_free_credits(session, github_username, github_user_id)
+    except BillingIdentityConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     task = Task(project_id=project.id, user_id=user.id, description=description)
     session.add(task)
     await session.commit()

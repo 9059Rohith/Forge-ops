@@ -7,6 +7,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
@@ -33,7 +34,7 @@ export default defineConfig({
       url: "http://127.0.0.1:3000",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
-      env: { NEXT_PUBLIC_API_URL: "http://127.0.0.1:8765" },
+      env: { BACKEND_URL: "http://127.0.0.1:8765" },
     },
   ],
   projects: [

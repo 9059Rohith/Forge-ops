@@ -1,0 +1,83 @@
+[
+  {
+    "id": "intro",
+    "kicker": "AUTONOMOUS ENGINEERING, WITH PROOF",
+    "title": "A green test suite\nis only the beginning.",
+    "accent": "Trust the evidence.",
+    "voice": "AI coding agents can deliver a patch that passes every test, while quietly weakening security. Meet ForgeGuard: autonomous engineering, with proof.",
+    "caption": "Passing tests alone cannot prove a patch is safe.",
+    "frames": 294,
+    "from": 0
+  },
+  {
+    "id": "submit",
+    "kicker": "01 / DEFINE THE TASK",
+    "title": "One task. Clear boundaries.",
+    "image": "entry.png",
+    "voice": "Start with a repository, a branch, and a clear engineering task. In this explicitly enabled showcase, we add exponential backoff to checkout, while preserving the public API.",
+    "caption": "Add retry handling. Preserve the public API.",
+    "frames": 336,
+    "from": 294
+  },
+  {
+    "id": "isolate",
+    "kicker": "02 / ISOLATE & INSPECT",
+    "title": "Every patch earns its verdict.",
+    "image": "graph.png",
+    "voice": "The engineer works in an isolated Git worktree. ForgeGuard captures the actual diff, runs deterministic checks, and sends the patch to independent security, scope, and adversarial reviewers.",
+    "caption": "Isolated worktree \u2192 real diff \u2192 independent review",
+    "frames": 352,
+    "from": 630
+  },
+  {
+    "id": "block",
+    "kicker": "03 / THE MOMENT THAT MATTERS",
+    "title": "Tests pass. The patch is blocked.",
+    "image": "flight.png",
+    "accent": "Authorization regression detected",
+    "voice": "Here is the critical moment. The checkout tests pass, but the first patch also removes an authorization check. Independent evidence catches the unrelated regression, and ForgeGuard blocks the patch.",
+    "caption": "A critical finding blocks the patch, even with passing tests.",
+    "frames": 366,
+    "from": 982
+  },
+  {
+    "id": "repair",
+    "kicker": "04 / BOUNDED RECOVERY",
+    "title": "Repair. Re-check. Verify.",
+    "image": "verified.png",
+    "voice": "The repair agent restores the authorization boundary while keeping the retry implementation. ForgeGuard then runs the entire verification loop again. The repaired patch reaches a verified verdict.",
+    "caption": "Bounded repair \u2192 fresh tests \u2192 fresh reviews \u2192 VERIFIED",
+    "frames": 361,
+    "from": 1348
+  },
+  {
+    "id": "proof",
+    "kicker": "05 / TAKE THE EVIDENCE WITH YOU",
+    "title": "A verdict you can inspect.",
+    "image": "proof.png",
+    "voice": "Inspect the diff and the timestamped flight recorder. Then download the verification receipt: a portable record of the evidence, with SHA 256 hashes that let you check its integrity independently.",
+    "caption": "Human-readable proof + downloadable SHA-256 receipt",
+    "frames": 354,
+    "from": 1709
+  },
+  {
+    "id": "live",
+    "kicker": "BUILT BEYOND THE SHOWCASE",
+    "title": "Your repositories.\nYour engineering workflow.",
+    "accent": "Live providers \u2022 Read-only audits \u2022 Repair Credits",
+    "voice": "Beyond this showcase, ForgeGuard supports real repositories, provider-backed engineering, read-only security audits, and credit-authorized repair jobs. Production automation begins with a signed GitHub webhook.",
+    "caption": "The showcase is opt-in. Live provider mode is the default.",
+    "frames": 371,
+    "from": 2063
+  },
+  {
+    "id": "outro",
+    "kicker": "FORGEGUARD",
+    "title": "Build fast.\nShip with proof.",
+    "accent": "github.com/9059Rohith/Forge-ops",
+    "voice": "Codex can write the code. ForgeGuard makes autonomous coding accountable. Build fast. Challenge independently. Ship with proof.",
+    "caption": "Explore the code, run the demo, and inspect the evidence.",
+    "frames": 341,
+    "from": 2434
+  }
+]

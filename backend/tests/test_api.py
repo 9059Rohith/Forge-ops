@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -49,11 +50,145 @@ async def test_create_and_read_task(client: AsyncClient, monkeypatch: pytest.Mon
 
 
 @pytest.mark.asyncio
+async def test_submission_reuses_project_when_concurrent_requests_created_duplicates(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.db import session_scope
+    from app.models import Project
+    from app.routers import tasks
+
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+    async with session_scope() as session:
+        session.add_all([
+            Project(repo_url="demo", branch="main"),
+            Project(repo_url="demo", branch="main"),
+        ])
+        await session.commit()
+
+    response = await client.post(
+        "/api/tasks",
+        json={"repo_url": "demo", "branch": "main", "description": "Add safe retries"},
+    )
+    assert response.status_code == 202
+    detail = await client.get(f"/api/tasks/{response.json()['task_id']}")
+    assert detail.json()["project"]["repo_url"] == "demo"
+
+
+@pytest.mark.asyncio
+async def test_real_repository_never_gets_a_demo_billing_owner(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+    repository = tmp_path / "real-repository"
+    repository.mkdir()
+    response = await client.post(
+        "/api/tasks",
+        json={
+            "repo_url": str(repository),
+            "branch": "main",
+            "description": "Add bounded retries",
+        },
+    )
+
+    assert response.status_code == 202
+    detail = await client.get(f"/api/tasks/{response.json()['task_id']}")
+    assert detail.json()["user_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_production_rejects_unsigned_manual_task_creation(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(
+        tasks,
+        "get_settings",
+        lambda: SimpleNamespace(
+            environment="production", demo_mode=False, allowed_repos=["acme/widget"]
+        ),
+    )
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+
+    response = await client.post(
+        "/api/tasks",
+        json={
+            "repo_url": "https://github.com/acme/widget",
+            "branch": "main",
+            "description": "Add bounded retries",
+        },
+    )
+
+    assert response.status_code == 403
+    assert "signed GitHub webhook" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_live_mode_rejects_the_bundled_demo_repository(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(
+        tasks,
+        "get_settings",
+        lambda: SimpleNamespace(environment="development", demo_mode=False, allowed_repos=[]),
+    )
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+
+    response = await client.post(
+        "/api/tasks",
+        json={"repo_url": "demo", "branch": "main", "description": "Add bounded retries"},
+    )
+
+    assert response.status_code == 422
+    assert "DEMO_MODE=true" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_github_task_persists_repository_full_name(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+    response = await client.post(
+        "/api/tasks",
+        json={
+            "repo_url": "https://github.com/acme/widget.git",
+            "branch": "main",
+            "description": "Add bounded retries",
+        },
+    )
+
+    assert response.status_code == 202
+    detail = await client.get(f"/api/tasks/{response.json()['task_id']}")
+    assert detail.json()["project"]["repo_full_name"] == "acme/widget"
+
+
+@pytest.mark.asyncio
 async def test_create_rejects_invalid_payload(client: AsyncClient):
     response = await client.post(
         "/api/tasks",
         json={"repo_url": "http://unsafe.example/repo", "branch": "main", "description": "x"},
     )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_rejects_caller_supplied_billing_owner(client: AsyncClient):
+    response = await client.post(
+        "/api/tasks",
+        json={
+            "repo_url": "demo",
+            "branch": "main",
+            "description": "Add bounded retries",
+            "user_id": "someone-elses-user-id",
+        },
+    )
+
     assert response.status_code == 422
 
 
@@ -113,6 +248,41 @@ async def test_proof_endpoint_includes_a_sealed_terminal_receipt(
     assert body["receipt"]["task"]["id"] == task_id
     assert body["receipt"]["decision"] == "VERIFIED"
     assert len(body["receipt"]["integrity"]["digest"]) == 64
+
+
+@pytest.mark.asyncio
+async def test_security_audit_receipt_is_not_mislabeled_as_blocked(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    from app.routers import tasks
+
+    monkeypatch.setattr(tasks, "schedule_task", lambda _task_id: None)
+    created = await client.post(
+        "/api/tasks",
+        json={
+            "repo_url": "demo",
+            "branch": "main",
+            "description": "Audit security vulnerabilities and document recommended fixes",
+        },
+    )
+    task_id = created.json()["task_id"]
+
+    from app.db import session_scope
+    from app.models import Task
+
+    async with session_scope() as session:
+        task = await session.get(Task, task_id)
+        assert task is not None
+        task.status = "audit_complete"
+        task.risk_level = "HIGH"
+        task.confidence_score = 94
+        task.proof_text = "## ForgeGuard Security Audit Complete\n"
+        await session.commit()
+
+    response = await client.get(f"/api/tasks/{task_id}/proof")
+
+    assert response.status_code == 200
+    assert response.json()["receipt"]["decision"] == "AUDIT_COMPLETE"
 
 
 @pytest.mark.asyncio

@@ -10,8 +10,11 @@ def compute_risk(
     adversarial: Mapping[str, Any],
     tests_passed: int,
     tests_total: int,
+    *,
+    test_exit_code: int = 0,
 ) -> dict[str, Any]:
-    test_score = 100 if tests_total > 0 and tests_passed == tests_total else 0
+    incomplete_tests = test_exit_code != 0 or tests_total <= 0 or tests_passed != tests_total
+    test_score = 0 if incomplete_tests else 100
     weights = {"security": 0.30, "scope": 0.20, "adversarial": 0.30, "tests": 0.20}
     overall = (
         int(security["score"]) * weights["security"]
@@ -23,7 +26,7 @@ def compute_risk(
         str(evaluation.get("severity", "")).lower() == "critical"
         for evaluation in (security, scope, adversarial)
     )
-    if critical or overall < 75:
+    if critical or incomplete_tests or overall < 75:
         risk_level = "HIGH" if overall < 60 or critical else "MEDIUM"
         decision = "BLOCKED"
     else:

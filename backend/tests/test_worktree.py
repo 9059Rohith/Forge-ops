@@ -4,7 +4,7 @@ import pytest
 from git import Actor, Repo
 
 from app.core.repository import apply_file_changes, resolve_safe_path
-from app.core.worktree import Worktree, assert_safe_push_branch
+from app.core.worktree import Worktree, WorktreeManager, assert_safe_push_branch
 
 
 def test_resolve_safe_path_accepts_nested_relative_path(tmp_path: Path):
@@ -37,9 +37,35 @@ def test_repair_branch_is_a_safe_write_target():
     assert assert_safe_push_branch("forgeguard/repair-task-123") == "forgeguard/repair-task-123"
 
 
+def test_remove_closes_both_worktree_repositories(tmp_path: Path):
+    class TrackingRepo:
+        def __init__(self):
+            self.closed = False
+            self.git = self
+
+        def close(self):
+            self.closed = True
+
+        def worktree(self, *args):
+            return None
+
+    checkout_repo = TrackingRepo()
+    owner_repo = TrackingRepo()
+    worktree = Worktree(
+        repo=checkout_repo,  # type: ignore[arg-type]
+        path=tmp_path / "missing-worktree",
+        owner_repo=owner_repo,  # type: ignore[arg-type]
+    )
+
+    WorktreeManager(tmp_path / "managed").remove(worktree)
+
+    assert checkout_repo.closed is True
+    assert owner_repo.closed is True
+
+
 def test_verified_worktree_pushes_only_dedicated_branch(tmp_path: Path):
     remote_path = tmp_path / "remote.git"
-    Repo.init(remote_path, bare=True)
+    bare_repo = Repo.init(remote_path, bare=True)
     checkout_path = tmp_path / "checkout"
     repo = Repo.init(checkout_path)
     actor = Actor("Test", "test@example.com")
@@ -57,3 +83,6 @@ def test_verified_worktree_pushes_only_dedicated_branch(tmp_path: Path):
 
     remote = Repo(remote_path)
     assert remote.commit(f"refs/heads/{branch}").message == "fix: apply verified ForgeGuard repair"
+    remote.close()
+    repo.close()
+    bare_repo.close()

@@ -6,7 +6,7 @@ import { createCheckout, getBillingStatus } from "@/lib/api";
 import type { BillingStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
-export function RepairCreditsCard({ userId = "demo" }: { userId?: string }) {
+export function RepairCreditsCard({ userId }: { userId: string }) {
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [error, setError] = useState(false);
   const [opening, setOpening] = useState(false);

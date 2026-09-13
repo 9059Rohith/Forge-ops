@@ -2,9 +2,10 @@ import { CheckCircle2, FlaskConical, Gauge, RotateCcw } from "lucide-react";
 import type { TaskDetail } from "@/lib/types";
 
 export function RiskPanel({ task }: { task: TaskDetail }) {
+  const auditComplete = task.status === "audit_complete";
   const rows = [
     { label: "Overall confidence", value: task.confidence_score == null ? "Pending" : `${task.confidence_score.toFixed(1)}%`, icon: Gauge },
-    { label: "Tests", value: `${task.tests_passed} / ${task.tests_total} passed`, icon: FlaskConical },
+    { label: auditComplete ? "Mode" : "Tests", value: auditComplete ? "Read-only audit" : `${task.tests_passed} / ${task.tests_total} passed`, icon: FlaskConical },
     { label: "Risk level", value: task.risk_level || "Pending", icon: CheckCircle2 },
     { label: "Repair cycles", value: String(task.repair_cycles), icon: RotateCcw },
   ];
@@ -22,4 +23,3 @@ export function RiskPanel({ task }: { task: TaskDetail }) {
     </section>
   );
 }
-

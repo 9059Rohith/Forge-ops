@@ -10,8 +10,8 @@
 
 [![Backend](https://img.shields.io/badge/backend-FastAPI-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
 [![Frontend](https://img.shields.io/badge/frontend-Next.js-64e6bd?style=flat-square&labelColor=0b141c)](#architecture)
-[![Tests](https://img.shields.io/badge/tests-93%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
-[![Demo](https://img.shields.io/badge/demo-no%20API%20keys%20required-64e6bd?style=flat-square&labelColor=0b141c)](#run-the-live-demo)
+[![Tests](https://img.shields.io/badge/tests-141%20passing-64e6bd?style=flat-square&labelColor=0b141c)](#verification-matrix)
+[![Run](https://img.shields.io/badge/run-real%20providers-64e6bd?style=flat-square&labelColor=0b141c)](#run-forgeguard-with-real-repositories)
 [![Evidence](https://img.shields.io/badge/evidence-SHA--256%20sealed-64e6bd?style=flat-square&labelColor=0b141c)](#tamper-evident-verification-receipt)
 
 Codex can write the code. ForgeGuard makes autonomous coding accountable.
@@ -30,6 +30,16 @@ Codex can write the code. ForgeGuard makes autonomous coding accountable.
 | Interactive API docs | [forge-ops.onrender.com/api/docs](https://forge-ops.onrender.com/api/docs) |
 
 The backend root intentionally has no HTML page; use the dashboard, health endpoint, or API documentation above.
+
+## Watch the narrated demo
+
+[![Watch the ForgeGuard application demo](docs/demo/forgeguard-demo-poster.png)](https://github.com/9059Rohith/Forge-ops/raw/refs/heads/master/docs/demo/forgeguard-demo.mp4)
+
+**[Watch or download the 1080p demo with audio](https://github.com/9059Rohith/Forge-ops/raw/refs/heads/master/docs/demo/forgeguard-demo.mp4)** · [Subtitles / transcript](docs/demo/forgeguard-demo.srt) · [Reproduce the video](demo-video/PRODUCTION.md)
+
+A two-minute narrated walkthrough of the actual application: define the task, inspect the agent graph, catch an authorization regression despite passing tests, repair it, and download the sealed receipt. This recording uses the explicitly enabled deterministic showcase. Live provider mode remains the default.
+
+The September completion pass also verified a real provider-backed repository task through all three reviewers. See [completion and verification evidence](docs/qa/completion-2026-09-13.md) for the checks and external integration limits.
 
 ## The problem in 60 seconds
 
@@ -77,6 +87,8 @@ That is the whole product in one sentence. The deterministic demo adds valid exp
 - **Repair Credits** — Dodo-backed, atomic one-job entitlements with idempotent usage and narrowly defined refunds.
 - **Signed GitHub automation** — size-limited, allowlisted push webhooks create repair jobs only after HMAC verification.
 - **Two execution modes** — a zero-key deterministic showcase and provider-backed work on real repositories.
+- **Read-only security audits** — security-analysis requests produce findings and an audit report without modifying repository files or implying a verified patch.
+- **Recoverable task navigation** — reopen an existing task by ID and continue inspecting its saved evidence.
 - **Production-shaped delivery** — Alembic, FastAPI, async SQLite/Postgres, Next.js, non-root Docker images, Compose, Vercel + Render manifests, and SHA-tagged CI releases.
 
 ## Repair Credits: one job, one authorization
@@ -187,9 +199,10 @@ The deterministic test channel contributes `100` only when **at least one test r
 | Rule | Decision |
 |---|---|
 | Any reviewer returns `critical` | `BLOCKED`, regardless of weighted score |
+| No tests ran, tests failed, or verification execution failed | `BLOCKED`, regardless of reviewer confidence |
 | Overall confidence below `60` or any critical finding | `HIGH` risk |
 | Overall confidence `60–74.99` | `MEDIUM` risk and `BLOCKED` |
-| Overall confidence at least `75`, no critical finding | `LOW` risk and `VERIFIED` |
+| Overall confidence at least `75`, no critical finding, successful test execution | `LOW` risk and `VERIFIED` |
 
 ## Tamper-evident verification receipt
 
@@ -237,7 +250,7 @@ assert receipt["receipt_id"] == f"fg_{digest[:16]}"
 
 This is an integrity seal, not a cryptographic identity signature. A future release can sign the digest through KMS or Sigstore without changing the evidence payload.
 
-## Run the live demo
+## Run ForgeGuard with real repositories
 
 ### Requirements
 
@@ -245,15 +258,18 @@ This is an integrity seal, not a cryptographic identity signature. A future rele
 - Node.js 20.9+
 - npm
 - Git
+- OpenAI API key
+- Groq API key
 
 ### Fastest path: Docker Compose
 
 ```bash
 copy .env.example .env
+# Edit .env and set OPENAI_API_KEY and GROQ_API_KEY.
 docker compose up --build
 ```
 
-On macOS/Linux, use `cp`. Open [http://localhost:3000](http://localhost:3000). The API applies `alembic upgrade head`, persists SQLite, exposes `/healthz` and `/readyz`, and the dashboard discovers `BACKEND_URL` at runtime.
+On macOS/Linux, use `cp`. Open [http://localhost:3000](http://localhost:3000). The API applies `alembic upgrade head`, persists SQLite, and exposes `/healthz` and `/readyz`. Browser calls stay on the dashboard origin and the Next.js server proxies them to the private Compose backend, so no public backend hostname or CORS setup is needed locally. Compose does not mount arbitrary host repositories; enter an HTTPS GitHub URL there. Use the source workflow below when submitting an absolute Windows, macOS, or Linux repository path.
 
 ### Run from source
 
@@ -271,36 +287,43 @@ python -m venv .venv
 
 pip install -r requirements-dev.txt
 copy .env.example .env
+# Edit .env and set OPENAI_API_KEY and GROQ_API_KEY.
 alembic upgrade head
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-For macOS/Linux, replace `copy` with `cp`.
-
-The safe template defaults to `DEMO_MODE=true`; the showcase requires no provider keys.
+For macOS/Linux, replace `copy` with `cp`. Keep `DEMO_MODE=false`; this is the default and guarantees real repositories use the configured model providers.
 
 #### 2. Start the dashboard
 
 ```bash
 cd frontend
-npm install
-copy .env.example .env.local
+npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+No frontend environment file is required for local development. Open [http://localhost:3000](http://localhost:3000). The server-side proxy defaults to `http://127.0.0.1:8000`; set server-only `BACKEND_URL` only when the API runs elsewhere.
 
-#### 3. Use the exact showcase input
+#### 3. Submit a real task
 
 | Field | Value |
 |---|---|
-| Repository | `demo` |
+| Repository | An absolute local Git repository path, or `https://github.com/owner/repository` |
 | Branch | `main` |
-| Engineering task | `Add retry handling with exponential backoff to checkout. Do not change the public API.` |
+| Engineering task | Your actual engineering change and constraints |
 
-Click **Start autonomous engineering**. The complete block → repair → verify story normally finishes in seconds because demo agents are deterministic and local.
+Click **Start autonomous engineering**. The dashboard navigates to the real job and shows model runs, deterministic repository tests, reviewer findings, the diff, and the final proof package. In local development, HTTPS GitHub repositories need `GITHUB_TOKEN` for private access. Production jobs are created only by signed GitHub webhooks so repository installation and owner identity come from GitHub rather than untrusted form input.
 
-## Use real providers and repositories
+### Verify both processes before opening the UI
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/readyz
+Invoke-RestMethod http://127.0.0.1:3000/api/backend/healthz
+```
+
+Both commands must return `status: ok` or `status: ready`. If the backend cannot be reached, the form now reports `ForgeGuard API is unavailable. Check the service connection and try again.` instead of the browser-only `Failed to fetch` error.
+
+## Provider and repository configuration
 
 Keep secrets only in `backend/.env`:
 
@@ -316,9 +339,26 @@ DODO_WEBHOOK_SECRET=
 SESSION_SECRET=
 ```
 
-Then submit either a local repository path or an HTTPS GitHub URL. The browser never receives provider credentials. Webhook signing is optional for the current task API and can be configured later with `GITHUB_WEBHOOK_SECRET`.
+In development, submit either a local repository path or an HTTPS GitHub URL. The browser never receives provider credentials. When `ENVIRONMENT=production`, direct `POST /api/tasks` requests are rejected; configure `GITHUB_WEBHOOK_SECRET` and the GitHub App, then create jobs through signed push webhooks.
 
 > Never put provider credentials in `frontend/.env.local`, a `NEXT_PUBLIC_*` variable, or a tracked `.env.example` file.
+
+### Optional deterministic test harness
+
+The bundled `demo` repository is disabled by default and is never selected for a real repository. To run it explicitly with Docker Compose:
+
+```powershell
+# Windows PowerShell
+$env:DEMO_MODE="true"
+docker compose up --build
+```
+
+```bash
+# macOS/Linux
+DEMO_MODE=true docker compose up --build
+```
+
+Open `http://localhost:3000`, enter `demo`, `main`, and the checkout retry task. Stop Compose when finished and clear the PowerShell override with `Remove-Item Env:DEMO_MODE`.
 
 ## API surface
 
@@ -327,7 +367,7 @@ Interactive documentation is available at `http://localhost:8000/api/docs`.
 | Method | Route | Purpose |
 |---|---|---|
 | `GET` | `/api/health` | Service health check |
-| `POST` | `/api/tasks` | Validate and schedule an autonomous engineering task |
+| `POST` | `/api/tasks` | Validate and schedule a development task; disabled in production |
 | `GET` | `/api/tasks/{id}` | Task state, scores, evaluations, and agent runs |
 | `GET` | `/api/tasks/{id}/flight-log` | Ordered execution trace |
 | `GET` | `/api/tasks/{id}/diff` | Captured staged Git diff |
@@ -444,9 +484,9 @@ ForgeGuard is currently a controlled hackathon service, not a public multi-tenan
 
 | Layer | Coverage | Command |
 |---|---:|---|
-| Backend | 78 tests | `cd backend && python -m pytest` |
+| Backend | 111 tests | `cd backend && python -m pytest` |
 | Python quality | Ruff rules | `cd backend && python -m ruff check app billing tests` |
-| Frontend | 12 tests | `cd frontend && npm test` |
+| Frontend | 26 tests | `cd frontend && npm test` |
 | Frontend types | TypeScript | `cd frontend && npm run typecheck` |
 | Production bundle | Next.js | `cd frontend && npm run build` |
 | Full browser flow | 4 desktop/mobile journeys | `cd frontend && npm run test:e2e` |

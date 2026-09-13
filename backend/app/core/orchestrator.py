@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Any
@@ -11,6 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from app.agents.adversarial_agent import run_adversarial_review
+from app.agents.audit_agent import build_audit_reviews, run_repository_security_audit
 from app.agents.demo import (
     demo_adversarial_review,
     demo_engineer,
@@ -25,7 +27,7 @@ from app.agents.security_agent import run_security_review
 from app.config import get_settings
 from app.core.deterministic_verifier import verify_repository
 from app.core.flight_recorder import record_event
-from app.core.proof_package import build_proof_package
+from app.core.proof_package import build_proof_package, build_security_audit_report
 from app.core.repository import apply_file_changes
 from app.core.risk_engine import compute_risk
 from app.core.worktree import Worktree, WorktreeManager
@@ -38,6 +40,53 @@ from billing.entitlement_service import EntitlementService
 from billing.service import ensure_demo_user
 
 logger = logging.getLogger(__name__)
+
+
+def classify_task(description: str) -> str:
+    """Separate read-only security analysis from repository-changing work."""
+    normalized = description.casefold()
+    asks_for_analysis = any(
+        re.search(rf"\b{verb}\b", normalized)
+        for verb in ("audit", "analyze", "analyse", "scan", "review", "identify", "test")
+    )
+    has_security_scope = any(
+        term in normalized
+        for term in (
+            "security",
+            "vulnerabil",
+            "authentication",
+            "authorization",
+            "dependency",
+            "secret",
+            "api risk",
+        )
+    )
+    change_request = re.sub(
+        r"\b(?:do not|don't|never)\s+(?:add|change|create|fix|implement|patch|remove|update)\b",
+        "",
+        normalized,
+    )
+    explicitly_read_only = bool(re.search(r"\bread[\s-]+only\b", normalized))
+    asks_for_change = any(
+        re.search(rf"\b{verb}\b", change_request)
+        for verb in ("add", "change", "create", "fix", "implement", "patch", "remove", "update")
+    )
+    if asks_for_analysis and has_security_scope and (explicitly_read_only or not asks_for_change):
+        return "security_audit"
+    return "change"
+
+
+def is_explicit_demo(repo_url: str) -> bool:
+    return get_settings().demo_mode and repo_url == "demo"
+
+
+def ownerless_local_repair_allowed(task: Task) -> bool:
+    return (
+        get_settings().environment.lower() != "production"
+        and task.user_id is None
+        and task.project.repo_url != "demo"
+        and not task.project.repo_url.startswith("https://github.com/")
+    )
 
 
 async def _load_task(task_id: str) -> Task:
@@ -110,7 +159,7 @@ async def _execute_agent(
 def _providers():
     settings = get_settings()
     if not settings.openai_api_key or not settings.groq_api_key:
-        raise RuntimeError("OPENAI_API_KEY and GROQ_API_KEY are required when DEMO_MODE=false")
+        raise RuntimeError("OPENAI_API_KEY and GROQ_API_KEY are required for non-demo repositories")
     openai = create_openai_provider(
         settings.openai_api_key, settings.openai_model, settings.engineer_timeout_seconds
     )
@@ -142,8 +191,7 @@ def _github_access_token(task: Task) -> str | None:
 
 
 async def _engineer(task: Task, worktree: Worktree) -> dict[str, Any]:
-    settings = get_settings()
-    if settings.demo_mode or task.project.repo_url == "demo":
+    if is_explicit_demo(task.project.repo_url):
         return await _execute_agent(
             task.id, "engineer", demo_engineer(worktree.path, task.description)
         )
@@ -154,8 +202,7 @@ async def _engineer(task: Task, worktree: Worktree) -> dict[str, Any]:
 
 
 async def _repair(task: Task, worktree: Worktree, diff: str, findings: str) -> dict[str, Any]:
-    settings = get_settings()
-    if settings.demo_mode or task.project.repo_url == "demo":
+    if is_explicit_demo(task.project.repo_url):
         return await _execute_agent(task.id, "repair", demo_repair(worktree.path, findings))
     openai, _ = _providers()
     return await _execute_agent(
@@ -166,8 +213,7 @@ async def _repair(task: Task, worktree: Worktree, diff: str, findings: str) -> d
 async def _review(
     task: Task, diff: str, changed_files: list[str], test_output: str
 ) -> dict[str, dict[str, Any]]:
-    settings = get_settings()
-    if settings.demo_mode or task.project.repo_url == "demo":
+    if is_explicit_demo(task.project.repo_url):
         calls = {
             "security": demo_security_review(diff, changed_files),
             "scope": demo_scope_review(task.description, changed_files, diff),
@@ -210,6 +256,74 @@ async def _review(
     return results
 
 
+async def _audit_repository(task: Task, worktree: Worktree) -> dict[str, dict[str, Any]]:
+    openai, _ = _providers()
+    audit = await _execute_agent(
+        task.id,
+        "security",
+        run_repository_security_audit(openai, worktree.path, task.description),
+    )
+    return build_audit_reviews(worktree.path, audit)
+
+
+async def _store_evaluations(task_id: str, reviews: dict[str, dict[str, Any]]) -> None:
+    async with session_scope() as session:
+        await session.execute(delete(Evaluation).where(Evaluation.task_id == task_id))
+        for name, review in reviews.items():
+            session.add(
+                Evaluation(
+                    task_id=task_id,
+                    category=name,
+                    score=int(review["score"]),
+                    severity=str(review["severity"]),
+                    finding=str(review["finding"]),
+                    evidence_json=json.dumps(review.get("evidence", {}), ensure_ascii=False),
+                )
+            )
+        await session.commit()
+
+
+async def _complete_security_audit(task: Task, worktree: Worktree) -> None:
+    await _update_task(task.id, status="reviewing", pending_plan="Read-only security audit")
+    reviews = await _audit_repository(task, worktree)
+    await _store_evaluations(task.id, reviews)
+    for name, review in reviews.items():
+        await record_event(
+            task.id, f"{name.title()} review: {review['score']}% ({review['severity']})"
+        )
+
+    severity_rank = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+    security_severity = str(reviews["security"]["severity"])
+    risk_level = (
+        "HIGH"
+        if severity_rank.get(security_severity, 0) >= 3
+        else "MEDIUM"
+        if severity_rank.get(security_severity, 0) == 2
+        else "LOW"
+    )
+    confidence = round(sum(float(review["score"]) for review in reviews.values()) / 3, 1)
+    findings = reviews["security"].get("evidence", {}).get("findings", [])
+    proof = build_security_audit_report(
+        description=task.description,
+        evaluations=reviews,
+        confidence=confidence,
+        risk_level=risk_level,
+    )
+    finding_count = len(findings) if isinstance(findings, list) else 0
+    noun = "finding" if finding_count == 1 else "findings"
+    await _finalize_task(
+        task.id,
+        f"Security audit completed with {finding_count} {noun}",
+        status="audit_complete",
+        confidence_score=confidence,
+        risk_level=risk_level,
+        proof_text=proof,
+        changed_files_json="[]",
+        diff_text="",
+        error_message=None,
+    )
+
+
 async def run_task(task_id: str) -> None:
     settings = get_settings()
     manager: WorktreeManager | None = None
@@ -217,7 +331,7 @@ async def run_task(task_id: str) -> None:
     github_token: str | None = None
     try:
         task = await _load_task(task_id)
-        if task.user_id is None and (settings.demo_mode or task.project.repo_url == "demo"):
+        if task.user_id is None and is_explicit_demo(task.project.repo_url):
             async with session_scope() as session:
                 demo_user = await ensure_demo_user(session)
             await _update_task(task_id, user_id=demo_user.id)
@@ -227,8 +341,6 @@ async def run_task(task_id: str) -> None:
         await record_event(task_id, "Repository reconnaissance complete")
 
         github_token = await asyncio.to_thread(_github_access_token, task)
-        repair_branch = f"forgeguard/repair-{task_id}"
-        await _update_task(task_id, repair_branch=repair_branch)
         manager = WorktreeManager(settings.work_root)
         worktree = await asyncio.to_thread(
             manager.create,
@@ -240,6 +352,13 @@ async def run_task(task_id: str) -> None:
         )
         await _update_task(task_id, worktree_path=str(worktree.path))
         await record_event(task_id, "Worktree created")
+        if classify_task(task.description) == "security_audit":
+            await record_event(task_id, "Read-only security audit selected")
+            await _complete_security_audit(task, worktree)
+            return
+
+        repair_branch = f"forgeguard/repair-{task_id}"
+        await _update_task(task_id, repair_branch=repair_branch)
         await _update_task(task_id, status="engineering")
 
         result = await _engineer(task, worktree)
@@ -261,7 +380,11 @@ async def run_task(task_id: str) -> None:
         await record_event(task_id, f"Patch captured ({len(changed_files)} files)")
 
         while True:
-            verification = await verify_repository(worktree.path, settings.command_timeout_seconds)
+            verification = await verify_repository(
+                worktree.path,
+                settings.command_timeout_seconds,
+                changed_files,
+            )
             await _update_task(
                 task_id,
                 tests_passed=verification.passed,
@@ -279,6 +402,7 @@ async def run_task(task_id: str) -> None:
                 reviews["adversarial"],
                 verification.passed,
                 verification.total,
+                test_exit_code=verification.exit_code,
             )
             await _update_task(
                 task_id,
@@ -355,7 +479,8 @@ async def run_task(task_id: str) -> None:
                     )
                 break
 
-            if not task.user_id:
+            local_repair = ownerless_local_repair_allowed(task)
+            if not task.user_id and not local_repair:
                 await _update_task(
                     task_id,
                     status="awaiting_authorization",
@@ -363,22 +488,25 @@ async def run_task(task_id: str) -> None:
                 )
                 await record_event(task_id, "Repair awaiting authorization")
                 break
-            async with session_scope() as session:
-                entitlement = await EntitlementService(session).reserve_for_job(
-                    task.user_id, task_id
-                )
-            if not entitlement.has_credit:
-                await _update_task(
+            if local_repair:
+                await record_event(task_id, "Local operator authorized repair (billing disabled)")
+            else:
+                async with session_scope() as session:
+                    entitlement = await EntitlementService(session).reserve_for_job(
+                        task.user_id, task_id
+                    )
+                if not entitlement.has_credit:
+                    await _update_task(
+                        task_id,
+                        status="awaiting_authorization",
+                        error_message="Repair plan ready — add a Repair Credit to continue.",
+                    )
+                    await record_event(task_id, "Repair awaiting authorization")
+                    break
+                await record_event(
                     task_id,
-                    status="awaiting_authorization",
-                    error_message="Repair plan ready — add a Repair Credit to continue.",
+                    f"Repair credit authorized ({entitlement.credits_remaining} remaining)",
                 )
-                await record_event(task_id, "Repair awaiting authorization")
-                break
-            await record_event(
-                task_id,
-                f"Repair credit authorized ({entitlement.credits_remaining} remaining)",
-            )
 
             cycle = task.repair_cycles + 1
             await _update_task(task_id, status="repairing", repair_cycles=cycle)

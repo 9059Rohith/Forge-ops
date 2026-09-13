@@ -1,0 +1,268 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "fg_f3e9f8e042a3f1ea",
+  "decision": "VERIFIED",
+  "task": {
+    "id": "bedcc046-6601-470d-b4e2-a3cc5459c03a",
+    "description": "Add retry handling with exponential backoff to checkout. Do not change the public API.",
+    "repository": "demo",
+    "branch": "main",
+    "changed_files": [
+      "checkout.py",
+      "tests/test_checkout.py"
+    ]
+  },
+  "verification": {
+    "tests": {
+      "passed": 5,
+      "total": 5
+    },
+    "reviewers": {
+      "adversarial": {
+        "score": 94,
+        "severity": "low",
+        "finding": "Retry bounds, backoff, public API, and non-transient behavior are covered.",
+        "evidence": {
+          "flagged_files": [],
+          "flagged_lines": []
+        }
+      },
+      "scope": {
+        "score": 97,
+        "severity": "none",
+        "finding": "Changes are limited to checkout behavior, tests, and the repaired security boundary.",
+        "evidence": {
+          "expected_file_count_range": "2-3",
+          "actual_file_count": 2,
+          "unrelated_files": []
+        }
+      },
+      "security": {
+        "score": 96,
+        "severity": "none",
+        "finding": "No high-risk security issues detected; authorization remains intact.",
+        "evidence": {
+          "flagged_files": [],
+          "flagged_lines": []
+        }
+      }
+    },
+    "confidence": 96.4,
+    "risk_level": "LOW",
+    "repair_cycles": 1
+  },
+  "provenance": {
+    "agent_runs": [
+      {
+        "agent_name": "engineer",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:07.347173",
+        "completed_at": "2026-09-13T11:41:07.424194"
+      },
+      {
+        "agent_name": "security",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:15.239686",
+        "completed_at": "2026-09-13T11:41:15.578574"
+      },
+      {
+        "agent_name": "scope",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:15.240198",
+        "completed_at": "2026-09-13T11:41:15.379803"
+      },
+      {
+        "agent_name": "adversarial",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:15.241096",
+        "completed_at": "2026-09-13T11:41:15.331274"
+      },
+      {
+        "agent_name": "repair",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:16.405534",
+        "completed_at": "2026-09-13T11:41:16.525308"
+      },
+      {
+        "agent_name": "security",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:23.963682",
+        "completed_at": "2026-09-13T11:41:24.229713"
+      },
+      {
+        "agent_name": "scope",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:23.966027",
+        "completed_at": "2026-09-13T11:41:24.115339"
+      },
+      {
+        "agent_name": "adversarial",
+        "status": "completed",
+        "started_at": "2026-09-13T11:41:23.969521",
+        "completed_at": "2026-09-13T11:41:24.315919"
+      }
+    ],
+    "flight_logs": [
+      {
+        "timestamp": "2026-09-13T11:41:06.337614",
+        "event": "Task received"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:06.402167",
+        "event": "Repository reconnaissance complete"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:07.215709",
+        "event": "Worktree created"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:07.378037",
+        "event": "Engineer Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:07.498957",
+        "event": "Engineer Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:07.605473",
+        "event": "Wrote checkout.py"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:07.674205",
+        "event": "Wrote tests/test_checkout.py"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:07.730603",
+        "event": "Wrote auth.py"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:08.672324",
+        "event": "Patch captured (3 files)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.098378",
+        "event": "Deterministic tests: 5/5 passed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.286592",
+        "event": "Adversarial Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.306501",
+        "event": "Scope Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.385327",
+        "event": "Adversarial Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.445387",
+        "event": "Scope Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.477018",
+        "event": "Adversarial review: 35% (high)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.547453",
+        "event": "Security Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.563852",
+        "event": "Scope review: 44% (high)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.605686",
+        "event": "Security Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.661629",
+        "event": "Security review: 18% (critical)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:15.939426",
+        "event": "Risk Engine: HIGH (44.7% confidence)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:16.057346",
+        "event": "Patch blocked by independent evidence"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:16.125455",
+        "event": "Repair credit authorized (1 remaining)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:16.328303",
+        "event": "Repair cycle 1 started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:16.493580",
+        "event": "Repair Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:16.564281",
+        "event": "Repair Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:17.323408",
+        "event": "Repair cycle 1 completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:23.843144",
+        "event": "Deterministic tests: 5/5 passed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.046471",
+        "event": "Scope Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.089911",
+        "event": "Security Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.173619",
+        "event": "Adversarial Agent started"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.312654",
+        "event": "Scope Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.363663",
+        "event": "Security Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.379977",
+        "event": "Adversarial Agent completed"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.465852",
+        "event": "Security review: 96% (none)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.521837",
+        "event": "Scope review: 97% (none)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.572274",
+        "event": "Adversarial review: 94% (low)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.648262",
+        "event": "Risk Engine: LOW (96.4% confidence)"
+      },
+      {
+        "timestamp": "2026-09-13T11:41:24.794250",
+        "event": "PR verified"
+      }
+    ]
+  },
+  "artifacts": {
+    "diff_sha256": "bf47288ef7f984d89f84fc5f85a7705a9d516562d6871a7443fed358187b3ca4",
+    "proof_sha256": "c313f4d6d368538e3276b52b7bdd308149f5b7d139d05a111a97ed558b8f8747"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "digest": "f3e9f8e042a3f1eab3f454329a6544f4cf58deeccb8e850e331f3233087aeccf"
+  }
+}

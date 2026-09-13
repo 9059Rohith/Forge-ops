@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
     workspace_retention_hours: int = Field(default=0, ge=0, le=720)
     max_repair_cycles: int = Field(default=2, ge=0, le=5)
-    demo_mode: bool = True
+    demo_mode: bool = False
     openai_api_key: str | None = None
     groq_api_key: str | None = None
     github_token: str | None = None
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     allowed_repos: list[str] | str = Field(default_factory=list)
     log_level: str = "INFO"
     openai_model: str = "gpt-4o"
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     engineer_timeout_seconds: float = 60.0
     reviewer_timeout_seconds: float = 30.0
     command_timeout_seconds: float = 120.0
